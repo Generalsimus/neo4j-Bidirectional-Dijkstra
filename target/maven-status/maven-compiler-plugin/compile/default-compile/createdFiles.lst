@@ -1,12 +1,10 @@
 com\example\neo4j\ExampleProcedure.class
-com\example\neo4j\ExampleProcedure$1.class
-com\example\neo4j\ExampleProcedure$1$1.class
-com\example\neo4j\ExampleProcedure$2.class
 com\example\neo4j\ExpiringQueue$QueueEntry.class
 com\example\neo4j\ExpiringQueue.class
-com\example\neo4j\ExampleProcedure$2$1.class
 com\example\neo4j\ExampleProcedure$ExampleResult.class
+com\example\neo4j\ExampleProcedure$YensProcessStorage$1.class
 com\example\neo4j\ExampleProcedure$ExamplePath.class
-com\example\neo4j\ExampleProcedure$3.class
-com\example\neo4j\ExampleProcedure$3$1.class
-com\example\neo4j\ExampleProcedure$DataStorage.class
+com\example\neo4j\ExampleProcedure$YensProcessStorage$1$1.class
+com\example\neo4j\ExampleProcedure$YensProcessStorage$2.class
+com\example\neo4j\ExampleProcedure$YensProcessStorage.class
+com\example\neo4j\ExampleProcedure$YensProcessStorage$2$1.class
