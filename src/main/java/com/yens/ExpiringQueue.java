@@ -1,9 +1,8 @@
-package com.example.neo4j;
+package com.yens;
 
 import java.util.concurrent.*;
 import java.util.PriorityQueue;
 import java.util.Comparator;
-import java.util.Map.Entry;
 
 public class ExpiringQueue<K, V> {
     private final ConcurrentHashMap<K, V> map = new ConcurrentHashMap<>();
@@ -19,10 +18,10 @@ public class ExpiringQueue<K, V> {
     public void put(K key, V value, long expirationTimeMillis) {
         long expirationTime = System.currentTimeMillis() + expirationTimeMillis;
         map.put(key, value);
-        synchronized (queue) {
-            queue.offer(new QueueEntry<>(key, expirationTime));
-            queue.notify(); // Notify the scheduler in case the new entry expires earlier
-        }
+        // synchronized (queue) {
+        queue.offer(new QueueEntry<>(key, expirationTime));
+        // queue.notify(); // Notify the scheduler in case the new entry expires earlier
+        // }
     }
 
     // Method to retrieve an entry
@@ -87,25 +86,4 @@ public class ExpiringQueue<K, V> {
         }
     }
 
-    // public static void main(String[] args) throws InterruptedException {
-    // // Example usage
-    // ExpiringQueue<String, String> queue = new ExpiringQueue<>();
-
-    // queue.put("key1", "value1", 5000); // Expires in 5 seconds
-    // queue.put("key2", "value2", 10000); // Expires in 10 seconds
-
-    // System.out.println("Initial size: " + queue.map.size()); // Output: 2
-
-    // Thread.sleep(7000);
-
-    // System.out.println("Size after 7 seconds: " + queue.map.size()); // Output: 1
-    // (key1 expired)
-
-    // Thread.sleep(5000);
-
-    // System.out.println("Size after 12 seconds: " + queue.map.size()); // Output:
-    // 0 (key2 expired)
-
-    // queue.shutdown();
-    // }
 }

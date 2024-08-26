@@ -1,20 +1,9 @@
-package com.example.neo4j;
+package com.yens;
 
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 import org.neo4j.values.AnyValue;
-import org.neo4j.values.virtual.PathValue;
-import org.neo4j.values.virtual.VirtualPathValue;
 
-// import com.example.ExampleProcedure.ExamplePath;
-// import com.example.ExampleProcedure.ExampleResult;
-
-// import com.example.ExampleProcedure.ExampleResult;
-// import com.example.ExampleProcedure.PathLink;
-
-// import com.example.ExampleProcedure.ChainPath;
-// import com.example.ExampleProcedure.ExampleResult;
-// import com.example.ExampleProcedure.PathResponse;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.neo4j.procedure.Mode;
@@ -30,7 +19,6 @@ import org.neo4j.graphalgo.impl.util.PathInterestFactory;
 
 import org.neo4j.graphalgo.impl.util.WeightedPathImpl;
 import org.neo4j.graphalgo.impl.path.Dijkstra;
-import org.neo4j.graphalgo.impl.util.WeightedPathIterator;
 import org.neo4j.graphdb.traversal.BranchState;
 
 import java.util.stream.Stream;
@@ -38,21 +26,13 @@ import java.util.stream.StreamSupport;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.util.List;
-import java.util.HashMap;
 import java.util.PriorityQueue;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Set;
 
 import org.neo4j.logging.Log;
-import org.neo4j.logging.LogProvider;
 
-// import org.neo4j.graphdb.*;
-import org.neo4j.graphalgo.*;
 import org.neo4j.kernel.impl.util.ValueUtils;
-// import org.neo4j.graphalgo.impl.path.Dijkstra;
-// import org.neo4j.graphalgo.yenKShortestPaths;
-import org.neo4j.procedure.*;
 
 // mvn clean package 
 
@@ -64,7 +44,7 @@ import org.neo4j.procedure.*;
 //     UNWIND  nodes(paths) as n
 //     RETURN n.phoneKey
 // };
-public class ExampleProcedure {
+public class YensShortestPath {
 
     @Context
     public GraphDatabaseService db;
@@ -74,7 +54,7 @@ public class ExampleProcedure {
 
     private static final ExpiringQueue<String, YensProcessStorage> storage = new ExpiringQueue<>();
 
-    @Procedure(name = "com.example.yenKShortestPaths", mode = Mode.READ)
+    @Procedure(name = "com.yens.shortestPaths", mode = Mode.READ)
     public Stream<ExamplePath> yenKShortestPaths(
             @Name("storageKey") String storageKey,
             @Name("startNode") Node startNode,
@@ -124,14 +104,6 @@ public class ExampleProcedure {
         return data;
     }
 
-    public static class ExampleResult {
-        public String message;
-
-        public ExampleResult(String message) {
-            this.message = message;
-        }
-    }
-
     public static class ExamplePath {
         public AnyValue paths;
 
@@ -150,18 +122,6 @@ public class ExampleProcedure {
             CostEvaluator<Double> costEvaluator,
             Log log) {
         PathImpl.Builder builder = new PathImpl.Builder(path1.startNode());
-
-        // log.info(String.format("path1from: %d %n", path1from));
-        // log.info(String.format("path1to: %d %n", path1to));
-
-        // log.info(String.format("path2from: %d %n", path2from));
-        // log.info(String.format("path2to: %d %n", path2to));
-
-        // log.info(String.format("concatPaths START"));
-        // for (Node node : path1.nodes()) {
-        // log.info(String.format("phoneKey: %s", node.getProperties("phoneKey")));
-        // }
-        // log.info(String.format("concatPaths END\n"));
 
         // // ss = path2.()
         int index1 = 0;
