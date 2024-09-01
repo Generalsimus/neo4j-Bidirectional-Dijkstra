@@ -95,12 +95,233 @@ public class YensShortestPath {
 
     @Context
     public Transaction tx;
-    // new ExpiringMap<>(10, TimeUnit.SECONDS));
-    // private static volatile ExpiringQueue<String, YensProcessStorage> storage;
-    // private static volatile ExpiringQueue<String, MyClass> queue;
-    // static {
-    // storage = new ExpiringQueue<>(1000);
-    // }
+
+    class CustomPath {
+        PathImpl.Builder builder;
+        double weightCost = 0.000;
+        CostEvaluator<Double> costEvaluator;
+        Node startNode;
+        Node endNode;
+        HashSet<String> blockedBetweenNode;
+
+        int size = 0;
+
+        public CustomPath(Node startNode, CostEvaluator<Double> costEvaluator) {
+            this.builder = new PathImpl.Builder(startNode);
+            this.startNode = startNode;
+            this.endNode = startNode;
+            this.blockedBetweenNode = new HashSet<>();
+            this.costEvaluator = costEvaluator;
+        }
+
+        public CustomPath(PathImpl.Builder builder, double weightCost, CostEvaluator<Double> costEvaluator,
+                Node startNode, Node endNode, HashSet<String> blockedBetweenNode, int size) {
+            this.builder = builder;
+            this.weightCost = weightCost;
+            this.costEvaluator = costEvaluator;
+            this.startNode = startNode;
+            this.endNode = endNode;
+            this.blockedBetweenNode = blockedBetweenNode;
+            this.size = size;
+        }
+
+        public double weight() {
+            return this.weightCost;
+        }
+
+        public Node endNode() {
+            return this.endNode;
+        }
+
+        public CustomPath addRelationship(Relationship rel, Direction direction) {
+            HashSet<String> newBlockedBetweenNode = new HashSet<>(this.blockedBetweenNode);
+
+            Node relStartNode = rel.getStartNode();
+            Node relEndNode = rel.getEndNode();
+            newBlockedBetweenNode.add(this.getFromToNodeId(relStartNode, relEndNode));
+            newBlockedBetweenNode.add(this.getFromToNodeId(relEndNode, relStartNode));
+
+            // this.size++;
+            return new CustomPath(
+                    builder.push(rel),
+                    this.weightCost + costEvaluator.getCost(rel, direction),
+                    this.costEvaluator,
+                    this.startNode,
+                    relEndNode,
+                    newBlockedBetweenNode,
+                    this.size + 1);
+        }
+
+        public String getFromToNodeId(Node from, Node to) {
+            return from.getElementId() + to.getElementId();
+
+        }
+
+        public boolean isBlocked(Relationship rel) {
+            return this.blockedBetweenNode.contains(this.getFromToNodeId(rel.getStartNode(), rel.getEndNode()));
+        }
+
+        public WeightedPath toWeightedPath() {
+            return new WeightedPathImpl(costEvaluator, this.getPath());
+        }
+
+        public Path getPath() {
+            return this.builder.build();
+        }
+
+    }
+
+    @Procedure(name = "com.eppstein.shortestPaths", mode = Mode.READ)
+    public Stream<ResponsePath> eppsteinShortestPaths(
+            @Name("storageKey") String storageKey,
+            @Name("startNode") Node startNode,
+            @Name("endNode") Node endNode,
+            @Name("k") long k) {
+        log.info("STARTED QUERY");
+        PriorityQueue<CustomPath> kShortestPaths = new PriorityQueue<>(
+                Comparator.comparingDouble(CustomPath::weight));
+        PriorityQueue<CustomPath> pathsQueue = new PriorityQueue<>(
+                Comparator.comparingDouble(CustomPath::weight));
+
+        CostEvaluator<Double> costEvaluator = (relationship, direction) -> 1.0;
+        Direction direction = Direction.OUTGOING;
+
+        // path.endNode().getRelationships(Direction.INCOMING)
+        pathsQueue.add(new CustomPath(startNode, costEvaluator));
+        // int ii = 0;
+
+        while (kShortestPaths.size() < k && pathsQueue.size() != 0) {
+            CustomPath curranPathPosition = pathsQueue.peek();
+
+            if (curranPathPosition.size > 30) {
+                break;
+            }
+            for (Relationship relationship : curranPathPosition.endNode().getRelationships(direction)) {
+
+                if (!curranPathPosition.isBlocked(relationship)) {
+                    CustomPath newPathPosition = curranPathPosition.addRelationship(relationship, direction);
+                    // console.log("🚀 --> @Name --> newPathPosition:", newPathPosition);
+                    log.info("EQ: " + (newPathPosition.endNode().equals(endNode)) + ", isBlocked: "
+                            + curranPathPosition.isBlocked(relationship) + ", SIZE:"
+                            + curranPathPosition.weight()
+                            + ", phoneKye: "
+                            + relationship.getEndNode().getProperties("phoneKey") + "::::"
+                            + endNode.getProperties("phoneKey"));
+
+                    if (newPathPosition.endNode().equals(endNode)) {
+                        log.info("SIZE: " + newPathPosition.weight());
+                        kShortestPaths.add(newPathPosition);
+                    } else {
+                        pathsQueue.add(newPathPosition);
+                    }
+                }
+
+            }
+            pathsQueue.poll();
+
+            // return kShortestPaths.stream()
+            // // .sorted(Comparator.comparingDouble(WeightedPath::weight))
+            // .map(path -> new ResponsePath(ValueUtils.of(path.toWeightedPath())));
+            // ii++;
+        }
+
+        log.info("ENDED QUERY");
+        return kShortestPaths.stream()
+                // .sorted(Comparator.comparingDouble(WeightedPath::weight))
+                .map(path -> new ResponsePath(ValueUtils.of(path.toWeightedPath())));
+    }
+
+    @Procedure(name = "com.dijkstra.shortestPaths", mode = Mode.READ)
+    public Stream<ResponsePath> dijkstraShortestPaths(
+            @Name("storageKey") String storageKey,
+            @Name("startNode") Node startNode,
+            @Name("endNode") Node endNode,
+            @Name("k") long k) {
+        CostEvaluator<Double> costEvaluator = (relationship, direction) -> 1.0;
+        PathInterest<Double> interest = PathInterestFactory.single(0.0);
+        double epsilon = 0.0;
+
+        LinkedList<WeightedPath> currentKPaths = new LinkedList<>();
+        // HashSet<String> blockedPaths = new HashSet<>();
+        // getPathId
+
+        // while (currentKPaths.size() < k) {
+        //
+        PathExpander<Double> baseExpander = new PathExpander<Double>() {
+            @Override
+            public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
+                List<Relationship> filteredRelationships = new ArrayList<>();
+
+                for (Relationship relationship : path.endNode().getRelationships(Direction.OUTGOING)) {
+
+                    if (relationship.getEndNode().equals(endNode)) {
+                        if ((currentKPaths.size() >= k)) {
+                            filteredRelationships.add(relationship);
+                            // currentKPaths.add(null)
+                            // path
+                        }
+                        // log.info("FIND NODE");
+if(){
+    
+    PathImpl.Builder pathBuilder = new PathImpl.Builder(path.startNode());
+    for (Relationship pathRelationship : path.relationships()) {
+        pathBuilder = pathBuilder.push(pathRelationship);
+    }
+    pathBuilder = pathBuilder.push(relationship);
+
+    currentKPaths.add(new WeightedPathImpl(costEvaluator, pathBuilder.build()));
+}
+                        // return new WeightedPathImpl(costEvaluator, builder.build());
+                        // currentKPaths
+                    } else {
+                        filteredRelationships.add(relationship);
+                    }
+
+                }
+                return Iterables.asResourceIterable(filteredRelationships);
+            }
+
+            @Override
+            public PathExpander<Double> reverse() {
+                return new PathExpander<Double>() {
+                    @Override
+                    public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
+                        return Iterables
+                                .asResourceIterable(path.endNode().getRelationships(Direction.OUTGOING));
+                    }
+
+                    @Override
+                    public PathExpander<Double> reverse() {
+                        return this; // Returning the current expander as reverse
+                    }
+                };
+            }
+        };
+        PathFinder<WeightedPath> dijkstra = new Dijkstra(baseExpander, costEvaluator, epsilon, interest);
+        // WeightedPath shortestPath =
+        dijkstra.findSinglePath(startNode, endNode);
+
+        // if (shortestPath != null) {
+        // currentKPaths.add(shortestPath);
+        // blockedPaths.add(getPathId(shortestPath));
+        // }
+        if (currentKPaths.size() == 0) {
+            return Stream.empty();
+        }
+        // }
+
+        return currentKPaths.stream()
+                // .sorted(Comparator.comparingDouble(WeightedPath::weight))
+                .map(path -> new ResponsePath(ValueUtils.of(path)));
+    }
+
+    public String getPathId(Path path) {
+        String id = "";
+        for (Relationship rel : path.relationships()) {
+            id += rel.getElementId();
+        }
+        return id;
+    }
 
     @Procedure(name = "com.yens.shortestPaths", mode = Mode.READ)
     public Stream<ResponsePath> yenKShortestPaths(
@@ -140,6 +361,7 @@ public class YensShortestPath {
         while (data.currentKPaths.size() < k && data.potentialPaths.size() > 0) {
 
             WeightedPath shortestPath = data.potentialPaths.peek();
+            // Direction.INCOMING : Direction.OUTGOING
 
             // List<Node> shortestPathNodes =
             // StreamSupport.stream(shortestPath.nodes().spliterator(), false)
@@ -148,98 +370,110 @@ public class YensShortestPath {
             // .stream(shortestPath.relationships().spliterator(), false)
             // .collect(Collectors.toList());
             for (Relationship ignoreRelationship : shortestPath.relationships()) {
+
                 if (data.currentKPaths.size() == k) {
                     break;
                 }
-                Node spurNode = ignoreRelationship.getStartNode();
-                data.BlockRelationship(ignoreRelationship, cachedData.shortPathIndex);
-                //
-                // Relationship ignoreRelationship =
-                // shortestPathRelationships.get(cachedData.shortPathIndex);
-                // if
-                // (ignoreRelationship.getStartNode().getProperties("phoneKey").equals("+995598362399")
-                // &&
-                // ignoreRelationship.getStartNode().getProperties("phoneKey").equals("+995558660067"))
-                // {
+                while (data.currentKPaths.size() != k) {
 
-                // log.info("ignoreRelationship: "
-                // + (cachedData.ignoreRelationshipsIds
-                // .contains("" + ignoreRelationship.getId()
-                // + cachedData.shortPathIndex))
-                // + ":::"
-                // + cachedData.shortPathIndex + ":::"
-                // + ignoreRelationship.getStartNode().getProperties("phoneKey") + ":::"
-                // + ignoreRelationship.getEndNode().getProperties("phoneKey") + ":::"
-                // + ("" + ignoreRelationship.getId()
-                // + cachedData.shortPathIndex)
-                // + "\n");
+                    Node spurNode = ignoreRelationship.getStartNode();
+                    data.BlockRelationship(ignoreRelationship, cachedData.shortPathIndex);
+                    //
+                    // Relationship ignoreRelationship =
+                    // shortestPathRelationships.get(cachedData.shortPathIndex);
+                    // if
+                    // (ignoreRelationship.getStartNode().getProperties("phoneKey").equals("+995598362399")
+                    // &&
+                    // ignoreRelationship.getStartNode().getProperties("phoneKey").equals("+995558660067"))
+                    // {
 
-                // log.info("INDEX: " + relationship.getElementId() + "-" +
-                // relationship.getElementId()
-                // + "-" + path.length() + "\n");
-                // }
-                // log.info("ignoreRelationship: " + ignoreRelationship.getElementId() + "--" +
-                // cachedData.shortPathIndex
-                // + "\n");
+                    // log.info("ignoreRelationship: "
+                    // + (cachedData.ignoreRelationshipsIds
+                    // .contains("" + ignoreRelationship.getId()
+                    // + cachedData.shortPathIndex))
+                    // + ":::"
+                    // + cachedData.shortPathIndex + ":::"
+                    // + ignoreRelationship.getStartNode().getProperties("phoneKey") + ":::"
+                    // + ignoreRelationship.getEndNode().getProperties("phoneKey") + ":::"
+                    // + ("" + ignoreRelationship.getId()
+                    // + cachedData.shortPathIndex)
+                    // + "\n");
 
-                // cachedData.ignoreRelationshipsIds.add(ignoreRelationship.getElementId());
-                // ignoreRelationships.add(ignoreRelationship);
+                    // log.info("INDEX: " + relationship.getElementId() + "-" +
+                    // relationship.getElementId()
+                    // + "-" + path.length() + "\n");
+                    // }
+                    // log.info("ignoreRelationship: " + ignoreRelationship.getElementId() + "--" +
+                    // cachedData.shortPathIndex
+                    // + "\n");
 
-                // log.info(String.format("spurNode.phoneKey: %s",
-                // spurNode.getProperties("phoneKey")));
-                // HashSet<Relationship> ignoreRelationships = this.ignoreRelationships;
+                    // cachedData.ignoreRelationshipsIds.add(ignoreRelationship.getElementId());
+                    // ignoreRelationships.add(ignoreRelationship);
 
-                PathExpander<Double> expander = new PathExpander<Double>() {
-                    @Override
-                    public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
-                        List<Relationship> filteredRelationships = new ArrayList<>();
+                    // log.info(String.format("spurNode.phoneKey: %s",
+                    // spurNode.getProperties("phoneKey")));
+                    // HashSet<Relationship> ignoreRelationships = this.ignoreRelationships;
 
-                        for (Relationship relationship : path.endNode().getRelationships(Direction.OUTGOING)) {
+                    PathExpander<Double> expander = new PathExpander<Double>() {
+                        @Override
+                        public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
+                            List<Relationship> filteredRelationships = new ArrayList<>();
 
-                            if (!data.isBlockedRelationship(relationship, path.length() + cachedData.shortPathIndex)) {
-                                filteredRelationships.add(relationship);
+                            for (Relationship relationship : path.endNode().getRelationships(Direction.OUTGOING)) {
+
+                                if (!data.isBlockedRelationship(relationship,
+                                        path.length() + cachedData.shortPathIndex)) {
+                                    filteredRelationships.add(relationship);
+                                }
+
                             }
-
+                            return Iterables.asResourceIterable(filteredRelationships);
                         }
-                        return Iterables.asResourceIterable(filteredRelationships);
+
+                        @Override
+                        public PathExpander<Double> reverse() {
+                            return new PathExpander<Double>() {
+                                @Override
+                                public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
+                                    return Iterables
+                                            .asResourceIterable(path.endNode().getRelationships(Direction.OUTGOING));
+                                }
+
+                                @Override
+                                public PathExpander<Double> reverse() {
+                                    return this; // Returning the current expander as reverse
+                                }
+                            };
+                        }
+                    };
+
+                    // Find the shortest path from spurNode using the modified expander
+                    Dijkstra dijkstra = new Dijkstra(expander, data.costEvaluator, data.epsilon, data.interest);
+                    // long startTime5 = System.nanoTime(); // Start time measurement
+
+                    WeightedPath spurPath = dijkstra.findSinglePath(spurNode, endNode);
+
+                    if (spurPath == null) {
+                        // cachedData.shortPathIndex++;
+                        break;
                     }
 
-                    @Override
-                    public PathExpander<Double> reverse() {
-                        return new PathExpander<Double>() {
-                            @Override
-                            public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
-                                return Iterables
-                                        .asResourceIterable(path.endNode().getRelationships(Direction.INCOMING));
-                            }
+                    WeightedPathImpl concatPath = concatPaths(shortestPath, 0, cachedData.shortPathIndex, spurPath, 0,
+                            spurPath.length(),
+                            data.costEvaluator);
 
-                            @Override
-                            public PathExpander<Double> reverse() {
-                                return this; // Returning the current expander as reverse
-                            }
-                        };
+                    if (concatPath.weight() <= shortestPath.weight()) {
+                        data.BlockRelationship(spurPath.relationships().iterator().next(), 0);
+
+                        data.potentialPaths.add(concatPath);
+                        data.currentKPaths.add(concatPath);
+
+                        log.info("concatPath.weight(): " + concatPath.weight(),
+                                ", shortestPath.weight(): " + shortestPath.weight());
+
+                        break;
                     }
-                };
-
-                // Find the shortest path from spurNode using the modified expander
-                Dijkstra dijkstra = new Dijkstra(expander, data.costEvaluator, data.epsilon, data.interest);
-                // long startTime5 = System.nanoTime(); // Start time measurement
-
-                WeightedPath spurPath = dijkstra.findSinglePath(spurNode, endNode);
-
-                if (spurPath == null) {
-                    cachedData.shortPathIndex++;
-                    continue;
                 }
-
-                WeightedPathImpl concatPath = concatPaths(shortestPath, 0, cachedData.shortPathIndex, spurPath, 0,
-                        spurPath.length(),
-                        data.costEvaluator);
-
-                data.BlockRelationship(spurPath.relationships().iterator().next(), 0);
-
-                data.potentialPaths.add(concatPath);
-                data.currentKPaths.add(concatPath);
                 // currentKPaths.add(concatPath);
                 // this.KPaths.add(concatPath);
                 cachedData.shortPathIndex++;
@@ -292,7 +526,7 @@ public class YensShortestPath {
         // }
         // transaction.commit(); // Commit the transaction
         return data.currentKPaths.stream()
-                .sorted(Comparator.comparingDouble(WeightedPath::weight))
+                // .sorted(Comparator.comparingDouble(WeightedPath::weight))
                 .map(path -> new ResponsePath(ValueUtils.of(path)));
         // }
 
@@ -403,7 +637,8 @@ public class YensShortestPath {
                     return new PathExpander<Double>() {
                         @Override
                         public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
-                            return Iterables.asResourceIterable(path.endNode().getRelationships(Direction.INCOMING));
+                            return Iterables
+                                    .asResourceIterable(path.endNode().getRelationships(Direction.OUTGOING));
                         }
 
                         @Override
@@ -416,6 +651,13 @@ public class YensShortestPath {
             PathFinder<WeightedPath> dijkstra = new Dijkstra(baseExpander, this.costEvaluator, this.epsilon,
                     this.interest);
             WeightedPath shortestPath = dijkstra.findSinglePath(startNode, endNode);
+
+            Iterable<WeightedPath> shortestPathh = dijkstra.findAllPaths(startNode, endNode);
+            for (WeightedPath pp : shortestPathh) {
+                log.info(" pp.length(): " + pp.length());
+            }
+            // console.log("🚀 --> YensPathFinderData --> voidinitDate --> shortestPath:",
+            // shortestPath);
 
             this.currentKPaths.add(shortestPath);
             this.potentialPaths.add(shortestPath);

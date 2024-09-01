@@ -1,10 +1,13 @@
 com\yens\YensShortestPath$YensPathFinderData$1.class
 com\yens\YensShortestPath$CacheStorage.class
-com\yens\YensShortestPath$1$1.class
+com\yens\YensShortestPath$CustomPath.class
 com\yens\YensShortestPath$YensPathFinderData$1$1.class
-com\yens\YensShortestPath.class
-com\yens\YensShortestPath$YensPathFinderData.class
 com\yens\ExpiringMap$ExpiringEntry.class
 com\yens\ExpiringMap.class
+com\yens\YensShortestPath$2$1.class
+com\yens\YensShortestPath$1$1.class
+com\yens\YensShortestPath$2.class
+com\yens\YensShortestPath.class
+com\yens\YensShortestPath$YensPathFinderData.class
 com\yens\YensShortestPath$1.class
 com\yens\YensShortestPath$ResponsePath.class
