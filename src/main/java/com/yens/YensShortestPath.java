@@ -2,6 +2,7 @@ package com.yens;
 
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
+import org.neo4j.procedure.Description;
 import org.neo4j.values.AnyValue;
 
 import com.yens.YensShortestPath.ResponsePath;
@@ -41,6 +42,7 @@ import java.util.PriorityQueue;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.TreeSet;
 // import org.neo4j.graphalgo.PathImpl;
@@ -54,7 +56,7 @@ import java.util.concurrent.TimeUnit;
 
 // MATCH (startNode:AllyNode {phoneKey: '+995598362399'}), (endNode:AllyNode
 // {phoneKey: '+995599992878'})
-// CALL com.yens.shortestPaths("sada2ss",startNode, endNode, 10)
+// CALL custom.dijkstra("sada2ss",startNode, endNode, 10)
 // YIELD paths
 // RETURN COLLECT {
 //     UNWIND range(0, size(nodes(paths))-2) as index 
@@ -63,7 +65,7 @@ import java.util.concurrent.TimeUnit;
 
 // MATCH (startNode:AllyNode {phoneKey: '+995598362399'}), (endNode:AllyNode
 // {phoneKey: '+995599992878'})
-// CALL com.yens.shortestPaths("sadas",startNode, endNode, 10)
+// CALL custom.dijkstra("sadas",startNode, endNode, 10)
 // YIELD paths
 // RETURN COLLECT {
 //     UNWIND  nodes(paths) as n
@@ -113,6 +115,12 @@ public class YensShortestPath {
 
     @Context
     public Transaction tx;
+
+    public interface RelationshipFilter<STATE> {
+        Iterator<Relationship> getRelationships(CustomPath path);
+
+        Iterator<Relationship> getReverseRelationships(CustomPath path);
+    }
 
     @Procedure(name = "com.dijkstra.shortestPaths", mode = Mode.READ)
     public Stream<ResponsePath> dijkstraShortestPaths(
@@ -222,7 +230,8 @@ public class YensShortestPath {
     // public static final ExpiringMap<String, CacheStorage> storage = new
     // ExpiringMap<>(100, TimeUnit.SECONDS);
 
-    @Procedure(value = "custom.dijkstra", mode = Mode.READ)
+    @Procedure(name = "custom.dijkstra", mode = Mode.READ)
+    @Description("A custom procedure that returns a greeting message.")
     public Stream<ResponsePath> dijkstra(
             @Name("storageKey") String storageKey,
             @Name("startNode") Node startNode,
@@ -253,7 +262,7 @@ public class YensShortestPath {
                 double currentDistance = distances.getOrDefault(currentNode, Double.MAX_VALUE);
                 double newDistance = currentDistance + weight;
 
-                if (newDistance <= distances.getOrDefault(rel, Double.MAX_VALUE)) {
+                if (newDistance <= distances.getOrDefault(neighbor, Double.MAX_VALUE)) {
                     CustomPath newEntry = currentEntry.addRelationship(rel, neighbor, Direction.OUTGOING);
 
                     if (endNode.equals(newEntry.getEndNode())) {
