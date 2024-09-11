@@ -4,7 +4,12 @@ import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 import org.neo4j.procedure.Description;
 import org.neo4j.values.AnyValue;
+import org.neo4j.values.virtual.ListValueBuilder;
 
+// import com.yens.YensShortestPath.CustomPath;
+// import com.yens.YensShortestPath.Linker;
+// import com.yens.YensShortestPath.LinkerType;
+import com.yens.YensShortestPath.RelationshipFilter;
 import com.yens.YensShortestPath.ResponsePath;
 
 // import com.yens.YensShortestPath.YensProcessStorage;
@@ -12,14 +17,19 @@ import com.yens.YensShortestPath.ResponsePath;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+// import org.neo4j.graphalgo.impl.util.Dijkstra;
 import org.neo4j.procedure.Mode;
 import org.neo4j.procedure.Context;
 import org.neo4j.graphdb.*;
-import org.neo4j.graphalgo.CostEvaluator;
+import org.neo4j.cypher.internal.expressions.functions.E;
+import org.neo4j.values.virtual.ListValue;
+
+// import org.neo4j.graphalgo.CostEvaluator;
 import org.neo4j.graphalgo.PathFinder;
 import org.neo4j.graphalgo.WeightedPath;
 import org.neo4j.internal.helpers.collection.Iterables;
 import org.neo4j.graphalgo.impl.util.PathImpl;
+// import org.neo4j.graphalgo.impl.util.NodeImpl;;
 import org.neo4j.graphalgo.impl.util.PathInterest;
 import org.neo4j.graphalgo.impl.util.PathInterestFactory;
 
@@ -38,6 +48,7 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -103,121 +114,8 @@ public class YensShortestPath {
     @Context
     public Log log;
 
-    // private static ExpiringQueue<String, YensProcessStorage> storage = new
-    // ExpiringQueue<>();
-    // ExpiringMap<String, String> expiringCache = new ExpiringMap<String,
-    // String>();
-    // @Context
-    // private final static ExpiringMap<String, YensProcessStorage> storage = new
-    // ExpiringMap<>(10, TimeUnit.SECONDS);
-    // private final static AtomicReference<ExpiringMap<String, YensProcessStorage>>
-    // storage = new AtomicReference<>(
-
     @Context
     public Transaction tx;
-
-    public interface RelationshipFilter<STATE> {
-        Iterator<Relationship> getRelationships(CustomPath path);
-
-        Iterator<Relationship> getReverseRelationships(CustomPath path);
-    }
-
-    @Procedure(name = "com.dijkstra.shortestPaths", mode = Mode.READ)
-    public Stream<ResponsePath> dijkstraShortestPaths(
-            @Name("storageKey") String storageKey,
-            @Name("startNode") Node startNode,
-            @Name("endNode") Node endNode,
-            @Name("k") long k) {
-        CostEvaluator<Double> costEvaluator = (relationship, direction) -> 1.0;
-        PathInterest<Double> interest = PathInterestFactory.single(0.0);
-        double epsilon = 0.0;
-
-        LinkedList<WeightedPath> currentKPaths = new LinkedList<>();
-        // HashSet<String> blockedPaths = new HashSet<>();
-        // getPathId
-
-        // while (currentKPaths.size() < k) {
-        //
-        PathExpander<Double> baseExpander = new PathExpander<Double>() {
-            @Override
-            public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
-                List<Relationship> filteredRelationships = new ArrayList<>();
-
-                for (Relationship relationship : path.endNode().getRelationships(Direction.OUTGOING)) {
-
-                    if (relationship.getEndNode().equals(endNode)) {
-                        // if ((currentKPaths.size() >= k)) {
-                        // // currentKPaths.add(null)
-                        // // path
-                        // }
-                        // // log.info("FIND NODE");
-                        if (currentKPaths.size() < k) {
-
-                            PathImpl.Builder pathBuilder = new PathImpl.Builder(path.startNode());
-                            for (Relationship pathRelationship : path.relationships()) {
-                                pathBuilder = pathBuilder.push(pathRelationship);
-                            }
-                            pathBuilder = pathBuilder.push(relationship);
-
-                            currentKPaths.add(new WeightedPathImpl(costEvaluator, pathBuilder.build()));
-                        }
-                        if (currentKPaths.size() == (k - 1)) {
-                            List<Relationship> endRelationships = new ArrayList<>();
-                            endRelationships.add(relationship);
-
-                            return Iterables.asResourceIterable(endRelationships);
-                        }
-                        // return new WeightedPathImpl(costEvaluator, builder.build());
-                        // currentKPaths
-                    } else {
-                        filteredRelationships.add(relationship);
-                    }
-
-                }
-                return Iterables.asResourceIterable(filteredRelationships);
-            }
-
-            @Override
-            public PathExpander<Double> reverse() {
-                return new PathExpander<Double>() {
-                    @Override
-                    public ResourceIterable<Relationship> expand(Path path, BranchState<Double> state) {
-                        return Iterables
-                                .asResourceIterable(path.endNode().getRelationships(Direction.OUTGOING));
-                    }
-
-                    @Override
-                    public PathExpander<Double> reverse() {
-                        return this; // Returning the current expander as reverse
-                    }
-                };
-            }
-        };
-        PathFinder<WeightedPath> dijkstra = new Dijkstra(baseExpander, costEvaluator, epsilon, interest);
-        // WeightedPath shortestPath =
-        dijkstra.findSinglePath(startNode, endNode);
-
-        // if (shortestPath != null) {
-        // currentKPaths.add(shortestPath);
-        // blockedPaths.add(getPathId(shortestPath));
-        // }
-        if (currentKPaths.size() == 0) {
-            return Stream.empty();
-        }
-        // }
-
-        return currentKPaths.stream()
-                // .sorted(Comparator.comparingDouble(WeightedPath::weight))
-                .map(path -> new ResponsePath(ValueUtils.of(path)));
-    }
-
-    public String getPathId(Path path) {
-        String id = "";
-        for (Relationship rel : path.relationships()) {
-            id += rel.getElementId();
-        }
-        return id;
-    }
 
     public static class ResponsePath {
         public AnyValue paths;
@@ -227,8 +125,17 @@ public class YensShortestPath {
         }
     }
 
-    // public static final ExpiringMap<String, CacheStorage> storage = new
-    // ExpiringMap<>(100, TimeUnit.SECONDS);
+    public interface RelationshipFilter {
+        ResourceIterable<Relationship> getRelationships(PathFinder path);
+
+        public ListValue concatPathsAsRelationshipList(PathFinder path1, PathFinder path2, Relationship rel,
+                double cost);
+    }
+
+    public interface CostEvaluator<T> {
+
+        T getCost(Relationship relationship);
+    }
 
     @Procedure(name = "custom.dijkstra", mode = Mode.READ)
     @Description("A custom procedure that returns a greeting message.")
@@ -237,90 +144,403 @@ public class YensShortestPath {
             @Name("startNode") Node startNode,
             @Name("endNode") Node endNode,
             @Name("k") long k) {
+
+        // PathConcat concat = new PathConcat() {
+        // @Override
+        // public CustomPath concat(CustomPath from, CustomPath to, double
+        // concatRelCost, Relationship concatRel) {
+        // // new NodeProxy(path.getEndNode())
+        // // CustomPath path,
+        // return from.concat(to, concatRelCost, concatRel);
+        // };
+        // };
+        // PathConcat reverseConcat = new PathConcat() {
+        // @Override
+        // public CustomPath concat(CustomPath from, CustomPath to, double
+        // concatRelCost, Relationship concatRel) {
+        // // new NodeProxy(path.getEndNode())
+        // // CustomPath path,
+        // return to.concat(from, concatRelCost, concatRel);
+        // };
+        // };
+
+        RelationshipFilter getRelationships = new RelationshipFilter() {
+            @Override
+            public ResourceIterable<Relationship> getRelationships(PathFinder path) {
+                // new NodeProxy(path.getEndNode())
+                return path.getEndNode().getRelationships(Direction.OUTGOING);
+            };
+
+            @Override
+            public ListValue concatPathsAsRelationshipList(PathFinder path1, PathFinder path2,
+                    Relationship rel,
+                    double cost) {
+                double weight = path1.getWeight() + path2.getWeight() + cost;
+                log.info(path1.chain.getSize() + ":::" + path2.chain.getSize());
+                // List<Relationship> relList = new ArrayList<Relationship>();
+
+                ListValueBuilder builder = ListValueBuilder
+                        .newListBuilder(((path1.chain.getSize() + path2.chain.getSize()) * 2) + 2);
+                for (Relationship chainRel : path1.chain) {
+                    log.info(chainRel + "1:::");
+                    // builder.add();
+                    // builder.
+                    builder.add(ValueUtils.asAnyValue(weight + "BB" + chainRel.getStartNode().getProperty("phoneKey")));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    builder.add(ValueUtils.asAnyValue(weight + "BB" + chainRel.getEndNode().getProperty("phoneKey")));
+
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getStartNode()));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getEndNode()));
+                    // relList.add(chainRel);
+                }
+
+                builder.add(ValueUtils.asAnyValue(weight + "BB" + rel.getStartNode().getProperty("phoneKey")));
+                // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                builder.add(ValueUtils.asAnyValue(weight + "BB" + rel.getEndNode().getProperty("phoneKey")));
+                // relList.add(rel);
+                for (Relationship chainRel : path2.chain) {
+                    // log.info(chainRel + "2:::");
+                    builder.add(ValueUtils.asAnyValue(weight + "BB" + chainRel.getStartNode().getProperty("phoneKey")));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    builder.add(ValueUtils.asAnyValue(weight + "BB" + chainRel.getEndNode().getProperty("phoneKey")));
+
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getStartNode()));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getEndNode()));
+                }
+                return builder.build();
+            };
+        };
+        RelationshipFilter getReverseRelationships = new RelationshipFilter() {
+            @Override
+            public ResourceIterable<Relationship> getRelationships(PathFinder path) {
+
+                return path.getEndNode().getRelationships(Direction.INCOMING);
+            };
+
+            @Override
+            public ListValue concatPathsAsRelationshipList(PathFinder path1, PathFinder path2,
+                    Relationship rel,
+                    double cost) {
+                log.info(path1.chain.getSize() + ":::" + path2.chain.getSize());
+                double weight = path1.getWeight() + path2.getWeight() + cost;
+                // List<Relationship> relList = new ArrayList<Relationship>();
+
+                ListValueBuilder builder = ListValueBuilder
+                        .newListBuilder(((path1.chain.getSize() + path2.chain.getSize()) * 2) + 2);
+                for (Relationship chainRel : path2.chain) {
+                    log.info(chainRel + "1:::");
+                    // builder.add();
+                    // builder.
+                    builder.add(ValueUtils.asAnyValue(weight + "EE" + chainRel.getStartNode().getProperty("phoneKey")));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    builder.add(ValueUtils.asAnyValue(weight + "EE" + chainRel.getEndNode().getProperty("phoneKey")));
+
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getStartNode()));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getEndNode()));
+                    // relList.add(chainRel);
+                }
+
+                builder.add(ValueUtils.asAnyValue(weight + "EE" + rel.getStartNode().getProperty("phoneKey")));
+                // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                builder.add(ValueUtils.asAnyValue(weight + "EE" + rel.getEndNode().getProperty("phoneKey")));
+                // relList.add(rel);
+                for (Relationship chainRel : path1.chain) {
+                    // log.info(chainRel + "2:::");
+                    builder.add(ValueUtils.asAnyValue(weight + "EE" + chainRel.getStartNode().getProperty("phoneKey")));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    builder.add(ValueUtils.asAnyValue(weight + "EE" + chainRel.getEndNode().getProperty("phoneKey")));
+
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getStartNode()));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getEndNode()));
+                }
+                return builder.build();
+            };
+        };
         // Priority queue for nodes to explore, ordered by shortest distance
-        PriorityQueue<CustomPath> pq = new PriorityQueue<>(Comparator.comparingDouble(CustomPath::getWeight));
-        Map<Node, Double> distances = new HashMap<>();
-        CostEvaluator<Double> costEvaluator = (relationship, direction) -> 1.0;
+        PriorityQueue<PathFinder> pq = new PriorityQueue<>(Comparator.comparingDouble(PathFinder::getWeight));
+        Map<Node, PathFinder> forwardDistances = new HashMap<>();
+        Map<Node, PathFinder> backForwardDistances = new HashMap<>();
+        // Forward forward = new Forward();
+        // Forward backForward = new Forward();
+        //
+        CostEvaluator<Double> costEvaluator = (relationship) -> 1.0;
 
-        pq.add(new CustomPath(startNode, costEvaluator));
-        // distances.put(startNode, 0.0);
+        PathFinder startEntry = new PathFinder(forwardDistances, backForwardDistances, startNode,
+                costEvaluator, getRelationships);
+        PathFinder endEntry = new PathFinder(backForwardDistances, forwardDistances, endNode,
+                costEvaluator, getReverseRelationships);
 
-        LinkedList<WeightedPath> currentKPaths = new LinkedList<>();
+        pq.add(startEntry);
+        pq.add(endEntry);
+
+        forwardDistances.put(startNode, startEntry);
+        // backForwardDistances.put(startNode, startEntry);
+        // forwardDistances.put(endNode, endEntry);
+        backForwardDistances.put(endNode, endEntry);
+
+        LinkedList<ListValue> currentKPaths = new LinkedList<>();
+
+        HashSet<Node> visited = new HashSet<>();
+        // visited.add(startNode);
+        // visited.add(endNode);
+        log.info("startNode: " + startNode.getProperties("phoneKey"));
+        log.info("endNode: " + endNode.getProperties("phoneKey"));
 
         while (!pq.isEmpty() && currentKPaths.size() < k) {
-            CustomPath currentEntry = pq.poll();
-            Node currentNode = currentEntry.getEndNode();
+            PathFinder currentEntry = pq.poll();
+            // Node currentNode = currentEntry.getEndNode();
 
             // Lazy loading of relationships
             // Iterable<Relationship> relationships =
             // currentNode.getRelationships(Direction.OUTGOING);
-            for (Relationship rel : currentNode.getRelationships(Direction.OUTGOING)) {
-                Node neighbor = rel.getEndNode();
 
-                double weight = costEvaluator.getCost(rel, Direction.OUTGOING);
+            // visited.add(currentEntry.getEndNode());
+            if (currentEntry.reverseMap.containsKey(currentEntry.getEndNode())) {
+                continue;
+            }
+            for (Relationship rel : currentEntry.getRelationships()) {
+                Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
 
-                double currentDistance = distances.getOrDefault(currentNode, Double.MAX_VALUE);
+                double weight = costEvaluator.getCost(rel);
+
+                double currentDistance = currentEntry.getCurrentMinCost(currentEntry.getEndNode());
+                // currentEntry.getWeight();
+                // distances.getOrDefault(currentNode, Double.MAX_VALUE);
                 double newDistance = currentDistance + weight;
+                PathFinder reversePath = currentEntry.getFromReverseMap(neighbor);
 
-                if (newDistance <= distances.getOrDefault(neighbor, Double.MAX_VALUE)) {
-                    CustomPath newEntry = currentEntry.addRelationship(rel, neighbor, Direction.OUTGOING);
+                // log.info("neighbor: " + neighbor.getProperties("phoneKey") + "isDestination:
+                // "
+                // + (reversePath == null) + ", Destination: "
+                // + currentEntry.getEndNode().getProperties("phoneKey") +
+                // ", ჩჩჩ: " + newDistance +
+                // "::" +
+                // currentEntry.getCurrentMinCost(neighbor));
 
-                    if (endNode.equals(newEntry.getEndNode())) {
-                        currentKPaths.add(newEntry.toWeightedPath());
-                        continue;
-                    }
+                if (reversePath != null) {
+                    log.info("FINDED:" + rel);
+                    // reversePath concatPathsAsRelationshipList
+                    //
+                    currentKPaths.add(
+                            currentEntry.concatPathsAsRelationshipList(reversePath, rel, weight));
+                    // currentEntry.map.remove(neighbor);
+                    // currentEntry.reverseMap.remove(neighbor);
 
-                    distances.put(neighbor, newDistance);
+                    // for (Relationship r : reversePath.builder.getClass()) {
 
-                    pq.add(newEntry);
+                    // }
+                    // currentKPaths.add(currentEntry.addRelationship(rel, weight,
+                    // neighbor).toWeightedPath());
+                    // currentKPaths.add(reversePath.addRelationship(rel, weight,
+                    // neighbor).toWeightedPath());
+                    // currentKPaths.add(reversePath.toWeightedPath());
+
+                    // for (Relationship n : reversePath.getRelationships()) {
+                    // log.info("s: " + n.getStartNode().getProperties("phoneKey") + ", e: "
+                    // + n.getEndNode().getProperties("phoneKey"));
+
+                    // }
+                    // currentKPaths.add(currentEntry.concat(reversePath, weight,
+                    // rel).toWeightedPath());
+
                 }
+                if (newDistance < currentEntry.getCurrentMinCost(neighbor)) {
+                    PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
+                    pq.add(newEntry);
+                    currentEntry.map.put(neighbor, newEntry);
+                }
+                // if (neighbor == null || newDistance <= neighbor.getWeight()) {
+                // CustomPath newEntry = currentEntry.addRelationship(rel,
+                // neighbor.getEndNode(),
+                // Direction.OUTGOING);
+
+                // if (endNode.equals(newEntry.getEndNode())) {
+                // currentKPaths.add(newEntry.toWeightedPath());
+                // continue;
+                // }
+
+                // // distances.put(neighbor, newDistance);
+
+                // pq.add(newEntry);
+                // }
             }
         }
+        // LinkedList<List<Relationship>> currentKPaths = new LinkedList<>();
 
         if (currentKPaths.isEmpty()) {
             return Stream.empty();
         }
 
         return currentKPaths.stream()
-                .map(path -> new ResponsePath(ValueUtils.of(path)));
+                .map(path -> new ResponsePath(path));
     }
 
-    public class CustomPath {
-        PathImpl.Builder builder;
+    public class ReversePathFinder {
+    }
+
+    public class Linker<E> implements Iterable<E> {
+        private Linker<E> before; // Points to the previous node
+        private E element; // The value of the current node
+
+        private int size = 0;
+
+        // Default constructor for an empty linker
+        public Linker() {
+        }
+
+        // Constructor for a linker with an initial element
+        public Linker(E element) {
+            this.element = element;
+            this.size = 1;
+        }
+
+        // Private constructor for internal usage (creating a new node with a link to
+        // the previous node)
+        private Linker(E element, Linker<E> before, int size) {
+            this.element = element;
+            this.before = before;
+            this.size = size;
+        }
+
+        // Adds a new element by creating a new Linker node and linking it to the
+        // current one
+        public Linker<E> push(E element) {
+            return new Linker<>(element, this, this.size + 1);
+        }
+
+        // Returns the current size of the linked list
+        public int getSize() {
+            return this.size;
+        }
+
+        @Override
+        public Iterator<E> iterator() {
+            return new LinkerIterator(this);
+        }
+
+        // Iterator class to traverse the Linker nodes
+        private class LinkerIterator implements Iterator<E> {
+            private Linker<E> current;
+
+            // Initialize with the starting node
+            public LinkerIterator(Linker<E> start) {
+                this.current = start;
+            }
+
+            @Override
+            public boolean hasNext() {
+                return current != null && current.element != null;
+            }
+
+            @Override
+            public E next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                E element = current.element;
+                current = current.before; // Move to the previous node
+                return element;
+            }
+        }
+    }
+
+    public class PathFinder {
+        Map<Node, PathFinder> map;
+        Map<Node, PathFinder> reverseMap;
+
         Node endNode;
+        Node destinationNode;
+        Linker<Relationship> chain;
 
         double weight = 0.000;
         CostEvaluator<Double> costEvaluator;
+        RelationshipFilter relationshipFilter;
 
-        CustomPath(Node startNode, CostEvaluator<Double> costEvaluator) {
-            this.endNode = startNode;
+        PathFinder(
+                Map<Node, PathFinder> map,
+                Map<Node, PathFinder> reverseMap,
+                Node endNode,
+                CostEvaluator<Double> costEvaluator,
+                RelationshipFilter relationshipFilter) {
+            this.map = map;
+            this.reverseMap = reverseMap;
+            this.endNode = endNode;
             this.costEvaluator = costEvaluator;
-            this.builder = new PathImpl.Builder(startNode);
+            this.relationshipFilter = relationshipFilter;
+            this.chain = new Linker<Relationship>();
+
         }
 
-        CustomPath(PathImpl.Builder builder, Node endNode, double weight, CostEvaluator<Double> costEvaluator) {
-            this.builder = builder;
+        PathFinder(
+                Map<Node, PathFinder> map,
+                Map<Node, PathFinder> reverseMap,
+                Node endNode,
+                double weight,
+                CostEvaluator<Double> costEvaluator,
+                RelationshipFilter relationshipFilter,
+                Linker<Relationship> chain) {
+            this.map = map;
+            this.reverseMap = reverseMap;
             this.endNode = endNode;
             this.weight = weight;
             this.costEvaluator = costEvaluator;
+            this.relationshipFilter = relationshipFilter;
+            this.chain = chain;
+        }
+
+        public double concat() {
+            return this.weight;
+        }
+
+        public ResourceIterable<Relationship> getRelationships() {
+            return this.relationshipFilter.getRelationships(this);
         }
 
         public double getWeight() {
             return this.weight;
         }
 
+        public PathFinder getFromReverseMap(Node node) {
+            return reverseMap.get(node);
+        }
+
+        public double getCurrentMinCost(Node node) {
+            PathFinder path = map.get(node);
+
+            if (path == null) {
+                return Double.MAX_VALUE;
+            }
+            return path.getWeight();
+        }
+
+        public ListValue concatPathsAsRelationshipList(PathFinder path,
+                Relationship concatRel, double concatRelCost) {
+            return this.relationshipFilter.concatPathsAsRelationshipList(this, path, concatRel, concatRelCost);
+        }
+
         public Node getEndNode() {
             return this.endNode;
         }
 
-        public CustomPath addRelationship(Relationship rel, Node newEndNode, Direction direction) {
+        public PathFinder addRelationship(Relationship rel, double relCost, Node newEndNode) {
+            // this.builder.
 
-            return new CustomPath(this.builder.push(rel), newEndNode,
-                    this.weight + this.costEvaluator.getCost(rel, direction), this.costEvaluator);
+            return new PathFinder(
+                    this.map,
+                    this.reverseMap,
+                    newEndNode,
+                    this.weight + relCost,
+                    this.costEvaluator,
+                    this.relationshipFilter,
+                    this.chain.push(rel));
         }
 
-        public WeightedPathImpl toWeightedPath() {
-            return new WeightedPathImpl(this.weight, this.builder.build());
+        public void toWeightedPath() {
+            // return new WeightedPathImpl(this.weight, this.builder.build());
         }
     }
 
