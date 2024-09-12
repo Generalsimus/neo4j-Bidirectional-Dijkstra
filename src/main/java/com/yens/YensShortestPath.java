@@ -145,25 +145,6 @@ public class YensShortestPath {
             @Name("endNode") Node endNode,
             @Name("k") long k) {
 
-        // PathConcat concat = new PathConcat() {
-        // @Override
-        // public CustomPath concat(CustomPath from, CustomPath to, double
-        // concatRelCost, Relationship concatRel) {
-        // // new NodeProxy(path.getEndNode())
-        // // CustomPath path,
-        // return from.concat(to, concatRelCost, concatRel);
-        // };
-        // };
-        // PathConcat reverseConcat = new PathConcat() {
-        // @Override
-        // public CustomPath concat(CustomPath from, CustomPath to, double
-        // concatRelCost, Relationship concatRel) {
-        // // new NodeProxy(path.getEndNode())
-        // // CustomPath path,
-        // return to.concat(from, concatRelCost, concatRel);
-        // };
-        // };
-
         RelationshipFilter getRelationships = new RelationshipFilter() {
             @Override
             public ResourceIterable<Relationship> getRelationships(PathFinder path) {
@@ -284,19 +265,14 @@ public class YensShortestPath {
 
         LinkedList<ListValue> currentKPaths = new LinkedList<>();
 
-        HashSet<Node> visited = new HashSet<>();
-        // visited.add(startNode);
-        // visited.add(endNode);
+        // HashSet<Node> visited = new HashSet<>();
+        // // visited.add(startNode);
+        // // visited.add(endNode);
         log.info("startNode: " + startNode.getProperties("phoneKey"));
         log.info("endNode: " + endNode.getProperties("phoneKey"));
 
         while (!pq.isEmpty() && currentKPaths.size() < k) {
             PathFinder currentEntry = pq.poll();
-            // Node currentNode = currentEntry.getEndNode();
-
-            // Lazy loading of relationships
-            // Iterable<Relationship> relationships =
-            // currentNode.getRelationships(Direction.OUTGOING);
 
             // visited.add(currentEntry.getEndNode());
             if (currentEntry.reverseMap.containsKey(currentEntry.getEndNode())) {
@@ -313,39 +289,12 @@ public class YensShortestPath {
                 double newDistance = currentDistance + weight;
                 PathFinder reversePath = currentEntry.getFromReverseMap(neighbor);
 
-                // log.info("neighbor: " + neighbor.getProperties("phoneKey") + "isDestination:
-                // "
-                // + (reversePath == null) + ", Destination: "
-                // + currentEntry.getEndNode().getProperties("phoneKey") +
-                // ", ჩჩჩ: " + newDistance +
-                // "::" +
-                // currentEntry.getCurrentMinCost(neighbor));
-
                 if (reversePath != null) {
                     log.info("FINDED:" + rel);
                     // reversePath concatPathsAsRelationshipList
                     //
                     currentKPaths.add(
                             currentEntry.concatPathsAsRelationshipList(reversePath, rel, weight));
-                    // currentEntry.map.remove(neighbor);
-                    // currentEntry.reverseMap.remove(neighbor);
-
-                    // for (Relationship r : reversePath.builder.getClass()) {
-
-                    // }
-                    // currentKPaths.add(currentEntry.addRelationship(rel, weight,
-                    // neighbor).toWeightedPath());
-                    // currentKPaths.add(reversePath.addRelationship(rel, weight,
-                    // neighbor).toWeightedPath());
-                    // currentKPaths.add(reversePath.toWeightedPath());
-
-                    // for (Relationship n : reversePath.getRelationships()) {
-                    // log.info("s: " + n.getStartNode().getProperties("phoneKey") + ", e: "
-                    // + n.getEndNode().getProperties("phoneKey"));
-
-                    // }
-                    // currentKPaths.add(currentEntry.concat(reversePath, weight,
-                    // rel).toWeightedPath());
 
                 }
                 if (newDistance < currentEntry.getCurrentMinCost(neighbor)) {
@@ -353,23 +302,9 @@ public class YensShortestPath {
                     pq.add(newEntry);
                     currentEntry.map.put(neighbor, newEntry);
                 }
-                // if (neighbor == null || newDistance <= neighbor.getWeight()) {
-                // CustomPath newEntry = currentEntry.addRelationship(rel,
-                // neighbor.getEndNode(),
-                // Direction.OUTGOING);
 
-                // if (endNode.equals(newEntry.getEndNode())) {
-                // currentKPaths.add(newEntry.toWeightedPath());
-                // continue;
-                // }
-
-                // // distances.put(neighbor, newDistance);
-
-                // pq.add(newEntry);
-                // }
             }
         }
-        // LinkedList<List<Relationship>> currentKPaths = new LinkedList<>();
 
         if (currentKPaths.isEmpty()) {
             return Stream.empty();
@@ -377,6 +312,188 @@ public class YensShortestPath {
 
         return currentKPaths.stream()
                 .map(path -> new ResponsePath(path));
+    }
+
+    @Procedure(name = "custom.dijkstraaa", mode = Mode.READ)
+    @Description("A custom procedure to find K shortest paths using bidirectional Dijkstra.")
+    public Stream<ResponsePath> dijkstraaa(
+            @Name("storageKey") String storageKey,
+            @Name("startNode") Node startNode,
+            @Name("endNode") Node endNode,
+            @Name("k") long k) {
+
+        RelationshipFilter getRelationships = new RelationshipFilter() {
+            @Override
+            public ResourceIterable<Relationship> getRelationships(PathFinder path) {
+                // new NodeProxy(path.getEndNode())
+                return path.getEndNode().getRelationships(Direction.OUTGOING);
+            };
+
+            @Override
+            public ListValue concatPathsAsRelationshipList(PathFinder path1, PathFinder path2,
+                    Relationship rel,
+                    double cost) {
+                double weight = path1.getWeight() + path2.getWeight() + cost;
+                log.info(path1.chain.getSize() + ":::" + path2.chain.getSize());
+                // List<Relationship> relList = new ArrayList<Relationship>();
+
+                ListValueBuilder builder = ListValueBuilder
+                        .newListBuilder(((path1.chain.getSize() + path2.chain.getSize()) * 2) + 2);
+                for (Relationship chainRel : path1.chain) {
+                    log.info(chainRel + "1:::");
+                    // builder.add();
+                    // builder.
+                    builder.add(ValueUtils.asAnyValue(weight + "BB" + chainRel.getStartNode().getProperty("phoneKey")));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    builder.add(ValueUtils.asAnyValue(weight + "BB" + chainRel.getEndNode().getProperty("phoneKey")));
+
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getStartNode()));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getEndNode()));
+                    // relList.add(chainRel);
+                }
+
+                builder.add(ValueUtils.asAnyValue(weight + "BB" + rel.getStartNode().getProperty("phoneKey")));
+                // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                builder.add(ValueUtils.asAnyValue(weight + "BB" + rel.getEndNode().getProperty("phoneKey")));
+                // relList.add(rel);
+                for (Relationship chainRel : path2.chain) {
+                    // log.info(chainRel + "2:::");
+                    builder.add(ValueUtils.asAnyValue(weight + "BB" + chainRel.getStartNode().getProperty("phoneKey")));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    builder.add(ValueUtils.asAnyValue(weight + "BB" + chainRel.getEndNode().getProperty("phoneKey")));
+
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getStartNode()));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getEndNode()));
+                }
+                return builder.build();
+            };
+        };
+        RelationshipFilter getReverseRelationships = new RelationshipFilter() {
+            @Override
+            public ResourceIterable<Relationship> getRelationships(PathFinder path) {
+
+                return path.getEndNode().getRelationships(Direction.INCOMING);
+            };
+
+            @Override
+            public ListValue concatPathsAsRelationshipList(PathFinder path1, PathFinder path2,
+                    Relationship rel,
+                    double cost) {
+                log.info(path1.chain.getSize() + ":::" + path2.chain.getSize());
+                double weight = path1.getWeight() + path2.getWeight() + cost;
+                // List<Relationship> relList = new ArrayList<Relationship>();
+
+                ListValueBuilder builder = ListValueBuilder
+                        .newListBuilder(((path1.chain.getSize() + path2.chain.getSize()) * 2) + 2);
+                for (Relationship chainRel : path2.chain) {
+                    log.info(chainRel + "1:::");
+                    // builder.add();
+                    // builder.
+                    builder.add(ValueUtils.asAnyValue(weight + "EE" + chainRel.getStartNode().getProperty("phoneKey")));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    builder.add(ValueUtils.asAnyValue(weight + "EE" + chainRel.getEndNode().getProperty("phoneKey")));
+
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getStartNode()));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getEndNode()));
+                    // relList.add(chainRel);
+                }
+
+                builder.add(ValueUtils.asAnyValue(weight + "EE" + rel.getStartNode().getProperty("phoneKey")));
+                // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                builder.add(ValueUtils.asAnyValue(weight + "EE" + rel.getEndNode().getProperty("phoneKey")));
+                // relList.add(rel);
+                for (Relationship chainRel : path1.chain) {
+                    // log.info(chainRel + "2:::");
+                    builder.add(ValueUtils.asAnyValue(weight + "EE" + chainRel.getStartNode().getProperty("phoneKey")));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    builder.add(ValueUtils.asAnyValue(weight + "EE" + chainRel.getEndNode().getProperty("phoneKey")));
+
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getStartNode()));
+                    // builder.add(ValueUtils.asRelationshipValue(chainRel));
+                    // builder.add(ValueUtils.asNodeValue(chainRel.getEndNode()));
+                }
+                return builder.build();
+            };
+        };
+        // Priority queues for forward and reverse Dijkstra
+        PriorityQueue<PathFinder> forwardPQ = new PriorityQueue<>(Comparator.comparingDouble(PathFinder::getWeight));
+        PriorityQueue<PathFinder> reversePQ = new PriorityQueue<>(Comparator.comparingDouble(PathFinder::getWeight));
+
+        // Maps to store shortest distances from start and end nodes
+        Map<Node, PathFinder> forwardDistances = new HashMap<>();
+        Map<Node, PathFinder> reverseDistances = new HashMap<>();
+
+        CostEvaluator<Double> costEvaluator = (relationship) -> 1.0;
+
+        // Initial PathFinder entries for start and end nodes
+        PathFinder startEntry = new PathFinder(forwardDistances, reverseDistances, startNode, costEvaluator,
+                getRelationships);
+        PathFinder endEntry = new PathFinder(reverseDistances, forwardDistances, endNode, costEvaluator,
+                getReverseRelationships);
+
+        // Add the initial entries to the priority queues
+        forwardPQ.add(startEntry);
+        reversePQ.add(endEntry);
+
+        forwardDistances.put(startNode, startEntry);
+        reverseDistances.put(endNode, endEntry);
+
+        // Track the K shortest paths found
+        LinkedList<ListValue> shortestPaths = new LinkedList<>();
+
+        // Continue processing while we have paths in the queue and haven't found K
+        // paths yet
+        while (!forwardPQ.isEmpty() && !reversePQ.isEmpty() && shortestPaths.size() < k) {
+            PathFinder currentForward = forwardPQ.poll();
+            PathFinder currentReverse = reversePQ.poll();
+
+            // Process forward search
+            processDijkstraStep(forwardPQ, currentForward, forwardDistances, reverseDistances, costEvaluator,
+                    shortestPaths, k, false);
+
+            // Process reverse search
+            processDijkstraStep(reversePQ, currentReverse, reverseDistances, forwardDistances, costEvaluator,
+                    shortestPaths, k, true);
+        }
+
+        // Return the list of shortest paths as a stream
+        return shortestPaths.stream().map(path -> new ResponsePath(path));
+    }
+
+    /**
+     * Process a single step in Dijkstra's algorithm for forward or reverse search.
+     */
+    private void processDijkstraStep(PriorityQueue<PathFinder> pq, PathFinder currentEntry,
+            Map<Node, PathFinder> currentDistances, Map<Node, PathFinder> oppositeDistances,
+            CostEvaluator<Double> costEvaluator, LinkedList<ListValue> shortestPaths, long k, boolean isReverse) {
+
+        for (Relationship rel : currentEntry.getRelationships()) {
+            Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
+            double weight = costEvaluator.getCost(rel);
+            double newDistance = currentEntry.getWeight() + weight;
+
+            if (!currentDistances.containsKey(neighbor) || newDistance < currentDistances.get(neighbor).getWeight()) {
+                PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
+                pq.add(newEntry);
+                currentDistances.put(neighbor, newEntry);
+            }
+
+            // Check if we have met the reverse search
+            if (oppositeDistances.containsKey(neighbor)) {
+                PathFinder reversePath = oppositeDistances.get(neighbor);
+                ListValue newPath = currentEntry.concatPathsAsRelationshipList(reversePath, rel, weight);
+
+                // Add the new path to the list of shortest paths
+                if (shortestPaths.size() < k) {
+                    shortestPaths.add(newPath);
+                } else {
+                    return; // Stop once we have found K shortest paths
+                }
+            }
+        }
     }
 
     public class ReversePathFinder {
