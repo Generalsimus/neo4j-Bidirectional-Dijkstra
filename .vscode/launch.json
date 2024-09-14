@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Debug Neo4j Plugin",
+            "request": "attach",
+            "hostName": "localhost",
+            "port": 5005,
+            "projectName": "your-project-name"
+        }
+    ]
+}
