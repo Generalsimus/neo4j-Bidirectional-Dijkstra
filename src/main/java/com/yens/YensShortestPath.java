@@ -176,15 +176,15 @@ public class YensShortestPath {
         // Forward forward = new Forward();
         // Forward backForward = new Forward();
         //
-        CostEvaluator<Double> costEvaluator = (relationship) -> 1.0;
-        // CostEvaluator<Double> costEvaluator = (relationship) -> {
-        // return ((Number) relationship.getProperty("weight", 1.0)).doubleValue();
-        // };
+        // CostEvaluator<Double> costEvaluator = (relationship) -> 1.0;
+        CostEvaluator<Double> costEvaluator = (relationship) -> {
+            return ((Number) relationship.getProperty("weight", 1.0)).doubleValue();
+        };
 
-        PathFinder startEntry = new PathFinder(forwardDistances, backForwardDistances, startNode, endNode,
-                costEvaluator, getRelationships, "Direction.OUTGOING");
-        PathFinder endEntry = new PathFinder(backForwardDistances, forwardDistances, endNode, startNode,
-                costEvaluator, getReverseRelationships, "Direction.INCOMING");
+        PathFinder startEntry = new PathFinder(forwardDistances, backForwardDistances, startNode,
+                costEvaluator, getRelationships);
+        PathFinder endEntry = new PathFinder(backForwardDistances, forwardDistances, endNode,
+                costEvaluator, getReverseRelationships);
 
         pq.add(startEntry);
         pq.add(endEntry);
@@ -205,9 +205,9 @@ public class YensShortestPath {
         // int minSize = 0;
         while (!pq.isEmpty()) {
             PathFinder currentEntry = pq.poll();
-            // if (currentEntry.reverseMap.containsKey(currentEntry.getEndNode())) {
-            //     continue;
-            // }
+            if (currentEntry.reverseMap.containsKey(currentEntry.getEndNode())) {
+                continue;
+            }
             // minSize++;
             // if (currentEntry.reverseMap.containsKey(currentEntry.getEndNode())
             // || currentEntry.map.containsKey(currentEntry.getEndNode())) {
@@ -244,14 +244,22 @@ public class YensShortestPath {
                             "SIZE: " + currentKPaths.size() +
                                     ", W1:" + reversePath.getWeight() +
                                     ", W2:" + pq.peek().getWeight());
-                    // if (reversePath.getWeight() <= pq.peek().getWeight()) {
+                    if (reversePath.getWeight() > pq.peek().getWeight()) {
+                        PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
+                        if (newEntry.getWeight() < currentEntry.getCurrentMinCost(neighbor)) {
+                            currentEntry.map.put(neighbor, newEntry);
+                        }
+                        pq.add(newEntry);
+                    } else {
 
-                    // log.info("FINDED:" + rel);
-                    reversePath.BlockNode(currentEntry.getEndNode());
+                        // if (reversePath.getWeight() <= pq.peek().getWeight()) {
 
-                    double newEntryWeight = currentEntry.getWeight() + reversePath.getWeight();
-                    double currentMinWeight = pq.peek().getWeight() + currentEntry.getWeight();
-                    if (newEntryWeight <= currentMinWeight) {
+                        // log.info("FINDED:" + rel);
+                        // reversePath.BlockNode(currentEntry.getEndNode());</Relationship></Relationship>
+
+                        // double newEntryWeight = currentEntry.getWeight() + reversePath.getWeight();
+                        // double currentMinWeight = pq.peek().getWeight() + currentEntry.getWeight();
+                        // if (newEntryWeight <= currentMinWeight) {
                         PathFinder pushEntry = currentEntry.relationshipFilter.concatPathsFinder(currentEntry,
                                 reversePath, rel,
                                 weight);
@@ -264,6 +272,7 @@ public class YensShortestPath {
                         }
                     }
                     // }
+                    // }
                     // continue;
                 }
 
@@ -272,15 +281,16 @@ public class YensShortestPath {
                 // currentEntry.getWeight();
                 // distances.getOrDefault(currentNode, Double.MAX_VALUE);
                 // double newDistance = currentDistance + weight;
-                if (currentEntry.reverseMap.containsKey(neighbor)) {
-                    continue;
-                }
+                // if (currentEntry.reverseMap.containsKey(neighbor.getElementId())) {
+                // continue;
+                // }
                 PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
                 if (newEntry.getWeight() < currentEntry.getCurrentMinCost(neighbor)) {
                     currentEntry.map.put(neighbor, newEntry);
+                    pq.add(newEntry);
                 }
                 // if (!currentEntry.reverseMap.containsKey(neighbor)) {
-                pq.add(newEntry);
+
                 // }
 
             }
@@ -367,12 +377,12 @@ public class YensShortestPath {
     public class PathFinder {
         Map<Node, PathFinder> map;
         Map<Node, PathFinder> reverseMap;
-        String direction;
+        // String direction;
         // Boolean isBlockedDirection = false;
-        Set<Node> blockedNodes = new HashSet<>();
+        // Set<Node> blockedNodes = new HashSet<>();</Node>
 
         Node endNode;
-        Node destinationNode;
+        // Node destinationNode;
 
         Linker<Relationship> chain;
 
@@ -384,17 +394,17 @@ public class YensShortestPath {
                 Map<Node, PathFinder> map,
                 Map<Node, PathFinder> reverseMap,
                 Node endNode,
-                Node destinationNode,
+                // Node destinationNode,
                 CostEvaluator<Double> costEvaluator,
-                RelationshipFilter relationshipFilter, String direction) {
+                RelationshipFilter relationshipFilter) {
             this.map = map;
             this.reverseMap = reverseMap;
             this.endNode = endNode;
-            this.destinationNode = destinationNode;
+            // this.destinationNode = destinationNode;
             this.costEvaluator = costEvaluator;
             this.relationshipFilter = relationshipFilter;
             this.chain = new Linker<Relationship>();
-            this.direction = direction;
+            // this.direction = direction;
 
         }
 
@@ -402,7 +412,7 @@ public class YensShortestPath {
                 Map<Node, PathFinder> map,
                 Map<Node, PathFinder> reverseMap,
                 Node endNode,
-                Node destinationNode,
+                // Node destinationNode,</Relationship>
                 double weight,
                 CostEvaluator<Double> costEvaluator,
                 RelationshipFilter relationshipFilter,
@@ -410,7 +420,7 @@ public class YensShortestPath {
             this.map = map;
             this.reverseMap = reverseMap;
             this.endNode = endNode;
-            this.destinationNode = destinationNode;
+            // this.destinationNode = destinationNode;
             this.weight = weight;
             this.costEvaluator = costEvaluator;
             this.relationshipFilter = relationshipFilter;
@@ -429,17 +439,17 @@ public class YensShortestPath {
             return this.weight;
         }
 
-        public void BlockNode(Node node) {
-            this.blockedNodes.add(node);
-        }
+        // public void BlockNode(Node node) {
+        // this.blockedNodes.add(node);
+        // }
 
-        public boolean isBlockNode(Node node) {
-            return this.blockedNodes.contains(node);
-        }
+        // public boolean isBlockNode(Node node) {
+        // return this.blockedNodes.contains(node);
+        // }
 
-        public boolean isEnded() {
-            return this.destinationNode.equals(this.endNode);
-        }
+        // public boolean isEnded() {
+        // return this.destinationNode.equals(this.endNode);
+        // }
 
         public PathFinder getFromReverseMap(Node node) {
             return reverseMap.get(node);
@@ -493,8 +503,8 @@ public class YensShortestPath {
             return new PathFinder(
                     path.map,
                     path.reverseMap,
-                    path.destinationNode,
-                    path.destinationNode,
+                    path.getEndNode(),
+                    // path.destinationNode,
                     this.weight + path.getWeight() + concatRelCost,
                     path.costEvaluator,
                     path.relationshipFilter,
@@ -521,8 +531,8 @@ public class YensShortestPath {
             return new PathFinder(
                     this.map,
                     this.reverseMap,
-                    this.destinationNode,
-                    this.destinationNode,
+                    this.getEndNode(),
+                    // this.destinationNode,
                     // path.getEndNode() ,
                     this.weight + path.getWeight() + concatRelCost,
                     this.costEvaluator,
@@ -537,10 +547,12 @@ public class YensShortestPath {
             for (Relationship chainRel : this.chain) {
                 // log.info(chainRel + "1:::");
                 builder.add(ValueUtils
-                        .asAnyValue(this.chain.getSize() + "BB" + chainRel.getStartNode().getProperty("phoneKey")));
+                        .asAnyValue(this.getWeight() + ",BB," + this.getWeight() + ",BB,"
+                                + chainRel.getStartNode().getProperty("phoneKey")));
                 // builder.add(ValueUtils.asRelationshipValue(chainRel));
                 builder.add(ValueUtils
-                        .asAnyValue(this.chain.getSize() + "BB" + chainRel.getEndNode().getProperty("phoneKey")));
+                        .asAnyValue(this.getWeight() + ",BB," + this.getWeight() + ",BB,"
+                                + chainRel.getEndNode().getProperty("phoneKey")));
 
             }
             // builder.add(ValueUtils.asAnyValue(weight + "BB" +
@@ -560,7 +572,6 @@ public class YensShortestPath {
                     this.map,
                     this.reverseMap,
                     newEndNode,
-                    this.destinationNode,
                     this.weight + relCost,
                     this.costEvaluator,
                     this.relationshipFilter,
