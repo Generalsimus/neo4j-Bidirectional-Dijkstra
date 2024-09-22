@@ -240,37 +240,40 @@ public class YensShortestPath {
                 PathFinder reversePath = currentEntry.getFromReverseMap(neighbor);
 
                 if (reversePath != null) {
+                    if (reversePath.getWeight() > pq.peek().getWeight()) {
+                        continue;
+                    }
                     log.info(
                             "SIZE: " + currentKPaths.size() +
                                     ", W1:" + reversePath.getWeight() +
-                                    ", W2:" + pq.peek().getWeight());
-                    if (reversePath.getWeight() > pq.peek().getWeight()) {
-                        PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
-                        if (newEntry.getWeight() < currentEntry.getCurrentMinCost(neighbor)) {
-                            currentEntry.map.put(neighbor, newEntry);
-                        }
-                        pq.add(newEntry);
-                    } else {
+                                    ", W2:" + pq.peek().getWeight() + ", weight: " + weight);
 
-                        // if (reversePath.getWeight() <= pq.peek().getWeight()) {
+                    // PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
+                    // if (newEntry.getWeight() < currentEntry.getCurrentMinCost(neighbor)) {
+                    // currentEntry.map.put(neighbor, newEntry);
+                    // }
+                    // pq.add(newEntry);
+                    // } else {
 
-                        // log.info("FINDED:" + rel);
-                        // reversePath.BlockNode(currentEntry.getEndNode());</Relationship></Relationship>
+                    // if (reversePath.getWeight() <= pq.peek().getWeight()) {
 
-                        // double newEntryWeight = currentEntry.getWeight() + reversePath.getWeight();
-                        // double currentMinWeight = pq.peek().getWeight() + currentEntry.getWeight();
-                        // if (newEntryWeight <= currentMinWeight) {
-                        PathFinder pushEntry = currentEntry.relationshipFilter.concatPathsFinder(currentEntry,
-                                reversePath, rel,
-                                weight);
-                        // pq.add(pushEntry);
-                        currentKPaths.add(
-                                pushEntry.toValue());
-                        if (currentKPaths.size() >= k) {
-                            return currentKPaths.stream()
-                                    .map(path -> new ResponsePath(path));
-                        }
+                    // log.info("FINDED:" + rel);
+                    // reversePath.BlockNode(currentEntry.getEndNode());</Relationship></Relationship>
+
+                    // double newEntryWeight = currentEntry.getWeight() + reversePath.getWeight();
+                    // double currentMinWeight = pq.peek().getWeight() + currentEntry.getWeight();
+                    // if (newEntryWeight <= currentMinWeight) {
+                    PathFinder pushEntry = currentEntry.relationshipFilter.concatPathsFinder(currentEntry,
+                            reversePath, rel,
+                            weight);
+                    // pq.add(pushEntry);
+                    currentKPaths.add(
+                            pushEntry.toValue());
+                    if (currentKPaths.size() >= k) {
+                        return currentKPaths.stream()
+                                .map(path -> new ResponsePath(path));
                     }
+                    // }
                     // }
                     // }
                     // continue;
