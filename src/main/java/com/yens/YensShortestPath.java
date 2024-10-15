@@ -6,16 +6,7 @@ import org.neo4j.procedure.Description;
 import org.neo4j.values.AnyValue;
 import org.neo4j.values.virtual.ListValueBuilder;
 
-// import com.yens.YensShortestPath.CustomPath;
-// import com.yens.YensShortestPath.Linker;
-// import com.yens.YensShortestPath.LinkerType;
-import com.yens.YensShortestPath.RelationshipFilter;
-import com.yens.YensShortestPath.ResponsePath;
-
 // import com.yens.YensShortestPath.YensProcessStorage;
-
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 // import org.neo4j.graphalgo.impl.util.Dijkstra;
 import org.neo4j.procedure.Mode;
@@ -24,45 +15,17 @@ import org.neo4j.graphdb.*;
 import org.neo4j.cypher.internal.expressions.functions.E;
 import org.neo4j.values.virtual.ListValue;
 
-// import org.neo4j.graphalgo.CostEvaluator;
-import org.neo4j.graphalgo.PathFinder;
-import org.neo4j.graphalgo.WeightedPath;
-import org.neo4j.internal.helpers.collection.Iterables;
-import org.neo4j.graphalgo.impl.util.PathImpl;
-// import org.neo4j.graphalgo.impl.util.NodeImpl;;
-import org.neo4j.graphalgo.impl.util.PathInterest;
-import org.neo4j.graphalgo.impl.util.PathInterestFactory;
-
-import org.neo4j.graphalgo.impl.util.WeightedPathImpl;
-import org.neo4j.graphalgo.impl.path.Dijkstra;
-import org.neo4j.graphdb.traversal.BranchState;
-
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-
-import javax.management.relation.Relation;
-
-import java.beans.Customizer;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.stream.Collectors;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
-import java.util.Set;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.TreeSet;
-// import org.neo4j.graphalgo.PathImpl;
-
 import org.neo4j.logging.Log;
 
 import org.neo4j.kernel.impl.util.ValueUtils;
-import java.util.concurrent.TimeUnit;
 
 // MATCH (startNode:AllyNode {phoneKey: '+995598362399'}), (endNode:AllyNode
 // {phoneKey: '+995591201013'})
@@ -135,11 +98,12 @@ public class YensShortestPath {
             @Name("endNode") Node endNode,
             @Name("k") long k) {
 
+        Direction direction = Direction.OUTGOING;
         RelationshipFilter getRelationships = new RelationshipFilter() {
             @Override
             public ResourceIterable<Relationship> getRelationships(PathFinder path) {
                 // new NodeProxy(path.getEndNode())
-                return path.getEndNode().getRelationships(Direction.OUTGOING);
+                return path.getEndNode().getRelationships(direction);
             };
 
             @Override
@@ -154,7 +118,7 @@ public class YensShortestPath {
             @Override
             public ResourceIterable<Relationship> getRelationships(PathFinder path) {
 
-                return path.getEndNode().getRelationships(Direction.INCOMING);
+                return path.getEndNode().getRelationships(direction.reverse());
             };
 
             @Override
@@ -165,11 +129,7 @@ public class YensShortestPath {
             };
         };
         // Priority queue for nodes to explore, ordered by shortest distance
-        // PriorityQueue<PathFinder> pq = new
-        // PriorityQueue<>(Comparator.comparingDouble(PathFinder::getWeight));
-        PriorityQueue<PathFinder> forwardPQ = new PriorityQueue<>(Comparator.comparingDouble(PathFinder::getWeight));
-        PriorityQueue<PathFinder> backForwardPQ = new PriorityQueue<>(
-                Comparator.comparingDouble(PathFinder::getWeight));
+        PriorityQueue<PathFinder> pq = new PriorityQueue<>(Comparator.comparingDouble(PathFinder::getWeight));
         Map<Node, PathFinder> forwardDistances = new HashMap<>();
         Map<Node, PathFinder> backForwardDistances = new HashMap<>();
         // Forward forward = new Forward();
@@ -177,6 +137,7 @@ public class YensShortestPath {
         //
         // CostEvaluator<Double> costEvaluator = (relationship) -> 1.0;
         CostEvaluator<Double> costEvaluator = (relationship) -> {
+            // return 1.00;
             return ((Number) relationship.getProperty("weight", 1.0)).doubleValue();
         };
 
@@ -185,18 +146,17 @@ public class YensShortestPath {
         PathFinder endEntry = new PathFinder(backForwardDistances, forwardDistances, endNode,
                 costEvaluator, getReverseRelationships);
 
-        forwardPQ.add(startEntry);
-        // pq.add(startEntry);
-        // pq.add(endEntry);
-        backForwardPQ.add(endEntry);
+        pq.add(startEntry);
+        pq.add(endEntry);
 
-        forwardDistances.put(startNode, startEntry);
+        // forwardDistances.put(startNode, startEntry);
         // backForwardDistances.put(startNode, startEntry);
         // forwardDistances.put(endNode, endEntry);
-        backForwardDistances.put(endNode, endEntry);
+        // backForwardDistances.put(endNode, endEntry);
 
         LinkedList<ListValue> currentKPaths = new LinkedList<>();
-
+        // HashList<Node> visited = new HashList<>();
+        //
         // HashSet<Node> visited = new HashSet<>();
         // // visited.add(startNode);
         // // visited.add(endNode);
@@ -204,21 +164,40 @@ public class YensShortestPath {
         log.info("endNode: " + endNode.getProperties("phoneKey"));
 
         // int minSize = 0;
-        while ((!forwardPQ.isEmpty() || !backForwardPQ.isEmpty()) && currentKPaths.size() < k) {
-            PathFinder forwardCurrentEntry = forwardPQ.poll();
-            PathFinder backForwardPQCurrentEntry = backForwardPQ.poll();
-            this.Forward(forwardCurrentEntry, currentKPaths, k, forwardPQ, costEvaluator);
-            this.Forward(backForwardPQCurrentEntry, currentKPaths, k, backForwardPQ, costEvaluator);
-            // if (currentEntry.getEndEntry() != null) {
-            // currentKPaths.add(currentEntry.getEndEntry().toValue());
+        while (!pq.isEmpty()) {
+            PathFinder currentEntry = pq.poll();
+            log.info("INC_PHO!: " + currentEntry.getEndNode().getProperty("phoneKey"));
+            PathFinder reversePath = currentEntry.getFromReverseMap(currentEntry.getEndNode());
+            if (reversePath != null) { 
+                PathFinder pushEntry = currentEntry.relationshipFilter.concatPathsFinder(currentEntry, reversePath);
 
-            // if (currentKPaths.size() >= k) {
-            // return currentKPaths.stream()
-            // .map(path -> new ResponsePath(path));
-            // }
-            // continue;
-            // }
+                currentKPaths.add(pushEntry.toValue());
 
+                if (currentKPaths.size() >= k) {
+                    return currentKPaths.stream()
+                            .map(path -> new ResponsePath(path));
+                }
+
+                continue;
+            }
+            if (!currentEntry.map.containsKey(currentEntry.getEndNode())) {
+                currentEntry.map.put(currentEntry.getEndNode(), currentEntry);
+            } else {
+                continue;
+            }
+
+            ResourceIterable<Relationship> sortedRelationships = currentEntry.getRelationships();
+
+            for (Relationship rel : sortedRelationships) {
+                Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
+
+                double weight = costEvaluator.getCost(rel);
+
+                PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
+
+                pq.add(newEntry);
+
+            }
         }
 
         if (currentKPaths.isEmpty()) {
@@ -226,53 +205,6 @@ public class YensShortestPath {
         }
 
         return currentKPaths.stream().map(path -> new ResponsePath(path));
-    }
-
-    public void Forward(PathFinder currentEntry, LinkedList<ListValue> currentKPaths, long k,
-            PriorityQueue<PathFinder> pq,
-            CostEvaluator<Double> costEvaluator) {
-        if (currentKPaths.size() >= k || currentEntry == null) {
-            // currentKPaths.stream()
-            // .map(path -> new ResponsePath(path));
-            return;
-        }
-        PathFinder reversePath = currentEntry.getFromReverseMap(currentEntry.getEndNode());
-        if (reversePath != null) {
-            PathFinder pushEntry = currentEntry.relationshipFilter.concatPathsFinder(currentEntry, reversePath);
-
-            // if (currentEntry.getWeight() < reversePath.getWeight()) {
-            // reversePath.setEndEntry(pushEntry);
-            // continue;
-            // }
-            log.info(
-                    "SIZE: " + currentKPaths.size() +
-                            ", W1:" + currentEntry.getWeight() +
-                            ", W2:" + reversePath.getWeight() + ", weight: " + pushEntry.getWeight());
-
-            currentKPaths.add(pushEntry.toValue());
-
-            return;
-        }
-
-        ResourceIterable<Relationship> sortedRelationships = currentEntry.getRelationships();
-
-        for (Relationship rel : sortedRelationships) {
-            Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
-
-            double weight = costEvaluator.getCost(rel);
-
-            PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
-
-            // log.info(
-            // ", INC!:" + currentEntry.getWeight() +
-            // ", INC2:" + newEntry.getWeight() +
-            // ", INC3:" + weight);
-            if (newEntry.getWeight() < currentEntry.getCurrentMinCost(neighbor)) {
-                currentEntry.map.put(neighbor, newEntry);
-            }
-            pq.add(newEntry);
-
-        }
     }
 
     public class ReversePathFinder {
@@ -399,6 +331,8 @@ public class YensShortestPath {
 
         public double getWeight() {
             return this.weight;
+            // * this.chain.getSize();
+            // (0.97 * this.chain.getSize());
         }
 
         public PathFinder getEndEntry() {
@@ -476,7 +410,7 @@ public class YensShortestPath {
                     path.reverseMap,
                     path.getEndNode(),
                     // path.destinationNode,
-                    this.weight + path.getWeight(),
+                    this.weight + path.weight,
                     path.costEvaluator,
                     path.relationshipFilter,
                     newChain);
@@ -518,11 +452,11 @@ public class YensShortestPath {
             for (Relationship chainRel : this.chain) {
                 // log.info(chainRel + "1:::");
                 builder.add(ValueUtils
-                        .asAnyValue(this.getWeight() + ",BB," + this.getWeight() + ",BB,"
+                        .asAnyValue(this.weight + ",BB,"
                                 + chainRel.getStartNode().getProperty("phoneKey")));
                 // builder.add(ValueUtils.asRelationshipValue(chainRel));
                 builder.add(ValueUtils
-                        .asAnyValue(this.getWeight() + ",BB," + this.getWeight() + ",BB,"
+                        .asAnyValue(this.weight + ",BB,"
                                 + chainRel.getEndNode().getProperty("phoneKey")));
 
             }
