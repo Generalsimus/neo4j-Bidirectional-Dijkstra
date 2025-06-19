@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.Executors;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -16,13 +17,14 @@ public class ExpiringMapStorage<K, V> {
 
     private final Map<K, V> internalMap;
 
-    private final Map<K, ExpiringKey<K>> expiringKeys;
+    private final Map<K, ExpiringEntry<K>> expiringEntries;
 
-    private final DelayQueue<ExpiringKey> delayQueue = new DelayQueue<ExpiringKey>();
+    private final DelayQueue<ExpiringEntry> delayQueue = new DelayQueue<ExpiringEntry>();
+    private final PriorityBlockingQueue<ExpiringEntry<K>> pq = new PriorityBlockingQueue<>();
 
     public ExpiringMapStorage() {
         internalMap = new ConcurrentHashMap<K, V>();
-        expiringKeys = new WeakHashMap<K, ExpiringKey<K>>();
+        expiringEntries = new WeakHashMap<K, ExpiringEntry<K>>();
 
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -34,13 +36,14 @@ public class ExpiringMapStorage<K, V> {
     }
 
     public V put(K key, V value, long lifeTimeMillis) {
-        ExpiringKey delayedKey = new ExpiringKey(key, lifeTimeMillis);
-        ExpiringKey oldKey = expiringKeys.put((K) key, delayedKey);
+        ExpiringEntry delayedKey = new ExpiringEntry(key, lifeTimeMillis);
+        ExpiringEntry oldKey = expiringEntries.put((K) key, delayedKey);
         if (oldKey != null) {
             expireKey(oldKey);
-            expiringKeys.put((K) key, delayedKey);
+            expiringEntries.put((K) key, delayedKey);
         }
         delayQueue.offer(delayedKey);
+        pq.add(delayedKey);
         return internalMap.put(key, value);
     }
 
@@ -49,7 +52,7 @@ public class ExpiringMapStorage<K, V> {
     }
 
     public boolean renewKey(K key) {
-        ExpiringKey<K> delayedKey = expiringKeys.get((K) key);
+        ExpiringEntry<K> delayedKey = expiringEntries.get((K) key);
         if (delayedKey != null) {
             delayedKey.renew();
             return true;
@@ -58,7 +61,7 @@ public class ExpiringMapStorage<K, V> {
     }
 
     public boolean updateLifeTimeMillis(K key, long maxLifeTimeMillis) {
-        ExpiringKey<K> delayedKey = expiringKeys.get((K) key);
+        ExpiringEntry<K> delayedKey = expiringEntries.get((K) key);
         if (delayedKey != null) {
             delayedKey.renew();
             delayedKey.updateMaxLifeTimeMillis(maxLifeTimeMillis);
@@ -67,7 +70,7 @@ public class ExpiringMapStorage<K, V> {
         return false;
     }
 
-    private void expireKey(ExpiringKey<K> delayedKey) {
+    private void expireKey(ExpiringEntry<K> delayedKey) {
         if (delayedKey != null) {
             delayedKey.expire();
             cleanup();
@@ -75,21 +78,22 @@ public class ExpiringMapStorage<K, V> {
     }
 
     private void cleanup() {
-        ExpiringKey<K> delayedKey = delayQueue.poll();
+        ExpiringEntry<K> delayedKey = delayQueue.poll();
+
         while (delayedKey != null) {
             internalMap.remove(delayedKey.getKey());
-            expiringKeys.remove(delayedKey.getKey());
+            expiringEntries.remove(delayedKey.getKey());
             delayedKey = delayQueue.poll();
         }
     }
 
-    private class ExpiringKey<K> implements Delayed {
+    private class ExpiringEntry<K> implements Delayed {
 
         private long startTime = System.currentTimeMillis();
         private long maxLifeTimeMillis;
         private final K key;
 
-        public ExpiringKey(K key, long maxLifeTimeMillis) {
+        public ExpiringEntry(K key, long maxLifeTimeMillis) {
             this.maxLifeTimeMillis = maxLifeTimeMillis;
             this.key = key;
         }
@@ -106,7 +110,7 @@ public class ExpiringMapStorage<K, V> {
             if (getClass() != obj.getClass()) {
                 return false;
             }
-            final ExpiringKey<K> other = (ExpiringKey<K>) obj;
+            final ExpiringEntry<K> other = (ExpiringEntry<K>) obj;
             if (this.key != other.key && (this.key == null || !this.key.equals(other.key))) {
                 return false;
             }
@@ -143,7 +147,7 @@ public class ExpiringMapStorage<K, V> {
 
         @Override
         public int compareTo(Delayed that) {
-            return Long.compare(this.getDelayMillis(), ((ExpiringKey) that).getDelayMillis());
+            return Long.compare(this.getDelayMillis(), ((ExpiringEntry) that).getDelayMillis());
         }
     }
 }
