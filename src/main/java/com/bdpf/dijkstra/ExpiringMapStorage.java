@@ -1,97 +1,149 @@
 package com.bdpf.dijkstra;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
 import java.util.concurrent.Executors;
-import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import java.util.concurrent.ConcurrentHashMap;
+public class ExpiringMapStorage<K, V> {
 
-public class ExpiringMapStorage<K, V extends AutoCloseable> {
+    private final Map<K, V> internalMap;
 
-    private final PriorityBlockingQueue<ExpiringEntry<V, K>> pq = new PriorityBlockingQueue<>();
-    private final ConcurrentHashMap<K, ExpiringEntry<V, K>> map = new ConcurrentHashMap<>();
+    private final Map<K, ExpiringKey<K>> expiringKeys;
+
+    private final DelayQueue<ExpiringKey> delayQueue = new DelayQueue<ExpiringKey>();
 
     public ExpiringMapStorage() {
+        internalMap = new ConcurrentHashMap<K, V>();
+        expiringKeys = new WeakHashMap<K, ExpiringKey<K>>();
+
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
         Runnable task = () -> {
-            while (!pq.isEmpty()) {
-                ExpiringEntry<V, K> entry = pq.poll();
-                if (entry != null && System.currentTimeMillis() > entry.getExpiredAt()) {
-                    try {
-                        entry.value.close();
-                    } catch (Exception e) {
-                        System.err.println("Error while closing value: " + e.getMessage());
-                    }
-                    map.remove(entry.getKey());
-                } else {
-                    pq.add(entry);
-                    break;
-                }
-            }
+            cleanup();
         };
 
         scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
     }
 
-    public void put(K key, V value, long expirationTimeSeconds) {
-        if (expirationTimeSeconds == 0) {
-            return;
+    public V put(K key, V value, long lifeTimeMillis) {
+        ExpiringKey delayedKey = new ExpiringKey(key, lifeTimeMillis);
+        ExpiringKey oldKey = expiringKeys.put((K) key, delayedKey);
+        if (oldKey != null) {
+            expireKey(oldKey);
+            expiringKeys.put((K) key, delayedKey);
         }
-        ExpiringEntry<V, K> entry = new ExpiringEntry<V, K>(value, key, expirationTimeSeconds);
-        pq.add(entry);
-        map.put(key, entry);
-    }
-
-    public void updateExpirationTimeSeconds(K key, long expirationTimeSeconds) {
-        ExpiringEntry<V, K> entry = this.map.get(key);
-        if (entry != null) {
-            entry.updateExpirationTimeSeconds(expirationTimeSeconds);
-        }
+        delayQueue.offer(delayedKey);
+        return internalMap.put(key, value);
     }
 
     public V get(K key) {
-        ExpiringEntry<V, K> entry = this.map.get(key);
-        if (entry == null) {
-            return null;
-        }
-
-        return entry.value;
+        return internalMap.get((K) key);
     }
 
-    private static class ExpiringEntry<V, K> implements Comparable<ExpiringEntry<V, K>> {
-        private final V value;
+    public boolean renewKey(K key) {
+        ExpiringKey<K> delayedKey = expiringKeys.get((K) key);
+        if (delayedKey != null) {
+            delayedKey.renew();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean updateLifeTimeMillis(K key, long maxLifeTimeMillis) {
+        ExpiringKey<K> delayedKey = expiringKeys.get((K) key);
+        if (delayedKey != null) {
+            delayedKey.renew();
+            delayedKey.updateMaxLifeTimeMillis(maxLifeTimeMillis);
+            return true;
+        }
+        return false;
+    }
+
+    private void expireKey(ExpiringKey<K> delayedKey) {
+        if (delayedKey != null) {
+            delayedKey.expire();
+            cleanup();
+        }
+    }
+
+    private void cleanup() {
+        ExpiringKey<K> delayedKey = delayQueue.poll();
+        while (delayedKey != null) {
+            internalMap.remove(delayedKey.getKey());
+            expiringKeys.remove(delayedKey.getKey());
+            delayedKey = delayQueue.poll();
+        }
+    }
+
+    private class ExpiringKey<K> implements Delayed {
+
+        private long startTime = System.currentTimeMillis();
+        private long maxLifeTimeMillis;
         private final K key;
-        private long expiredAt;
 
-        public ExpiringEntry(V value, K key, long expirationTimeSeconds) {
-            this.value = value;
+        public ExpiringKey(K key, long maxLifeTimeMillis) {
+            this.maxLifeTimeMillis = maxLifeTimeMillis;
             this.key = key;
-            this.updateExpirationTimeSeconds(expirationTimeSeconds);
-        }
-
-        public long getExpiredAt() {
-            return this.expiredAt;
-        }
-
-        public void updateExpirationTimeSeconds(long expirationTimeSeconds) {
-            this.expiredAt = System.currentTimeMillis() + 1000 * expirationTimeSeconds;
         }
 
         public K getKey() {
-            return this.key;
+            return key;
         }
 
         @Override
-        public int compareTo(ExpiringEntry<V, K> other) {
-            return Long.compare(this.expiredAt, other.expiredAt);
+        public boolean equals(Object obj) {
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final ExpiringKey<K> other = (ExpiringKey<K>) obj;
+            if (this.key != other.key && (this.key == null || !this.key.equals(other.key))) {
+                return false;
+            }
+            return true;
         }
 
         @Override
-        public String toString() {
-            return value.toString();
+        public int hashCode() {
+            int hash = 7;
+            hash = 31 * hash + (this.key != null ? this.key.hashCode() : 0);
+            return hash;
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit) {
+            return unit.convert(getDelayMillis(), TimeUnit.MILLISECONDS);
+        }
+
+        private long getDelayMillis() {
+            return (startTime + maxLifeTimeMillis) - System.currentTimeMillis();
+        }
+
+        public void renew() {
+            startTime = System.currentTimeMillis();
+        }
+
+        public void expire() {
+            startTime = System.currentTimeMillis() - maxLifeTimeMillis - 1;
+        }
+
+        public void updateMaxLifeTimeMillis(long maxLifeTimeMillis) {
+            this.maxLifeTimeMillis = maxLifeTimeMillis;
+        }
+
+        @Override
+        public int compareTo(Delayed that) {
+            return Long.compare(this.getDelayMillis(), ((ExpiringKey) that).getDelayMillis());
         }
     }
-
 }

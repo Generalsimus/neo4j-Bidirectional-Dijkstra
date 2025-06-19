@@ -32,7 +32,7 @@ public class RegenerationDb extends BulkDataProcessor {
         // AtomicReference<ResourceIterator<Node>> nodesIterator = new AtomicInteger(0);
         // ResourceIterator<Node> nodesIterator = null;
         // db.runQuery("");
-        db.executeTransactionally("MATCH (n) CALL { WITH n DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS;");
+        db.executeTransactionally("MATCH (n) CALL { WITH n DETACH DELETE n } IN TRANSACTIONS OF 500 ROWS;");
         log.info("START @ii");
 
         this.runTransaction((tx, commit, close) -> {

@@ -1,4 +1,3 @@
-
 package com.bdpf.dijkstra;
 
 import java.util.stream.Stream;
@@ -67,9 +66,9 @@ public class Dijkstra {
         if (storage == null) {
             storage = new DataStorage(db, startNode, endNode, costEvaluator, getRelationships,
                     getReverseRelationships);
-            Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds);
+            Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds * 1000);
         } else {
-            Dijkstra.storage.updateExpirationTimeSeconds(storageKey, storageExpirationSeconds);
+            Dijkstra.storage.updateLifeTimeMillis(storageKey, storageExpirationSeconds * 1000);
         }
         return storage;
     }
@@ -112,8 +111,6 @@ public class Dijkstra {
             PathFinder currentEntry = pq.poll();
             PathFinder reversePath = currentEntry.getFromReverseMap(currentEntry.getEndNode());
 
-
-            
             if (reversePath != null) {
                 double currentWeight = currentEntry.getWeight() + reversePath.getWeight();
 
