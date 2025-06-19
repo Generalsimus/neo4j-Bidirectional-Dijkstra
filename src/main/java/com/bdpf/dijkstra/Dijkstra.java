@@ -66,9 +66,9 @@ public class Dijkstra {
         if (storage == null) {
             storage = new DataStorage(db, startNode, endNode, costEvaluator, getRelationships,
                     getReverseRelationships);
-            Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds * 1000);
+            Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds);
         } else {
-            Dijkstra.storage.updateLifeTimeMillis(storageKey, storageExpirationSeconds * 1000);
+            Dijkstra.storage.updateExpirationTimeSeconds(storageKey, storageExpirationSeconds);
         }
         return storage;
     }
