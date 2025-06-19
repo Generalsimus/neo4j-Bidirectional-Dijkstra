@@ -17,22 +17,22 @@ public class ExpiringMapStorage<K, V extends AutoCloseable> {
 
         Runnable task = () -> {
             while (!pq.isEmpty()) {
-                ExpiringEntry<V, K> entry = pq.poll();
+                ExpiringEntry<V, K> entry = pq.peek();
                 if (entry == null) {
                     break;
                 }
-
-                if (System.currentTimeMillis() > entry.getExpiredAt() || pq.size() > 15) {
-                    try {
-                        entry.value.close();
-                    } catch (Exception e) {
-                        System.err.println("Error while closing value: " + e.getMessage());
-                    }
-                    map.remove(entry.getKey());
-                } else {
-                    pq.add(entry);
+                if (System.currentTimeMillis() < entry.getExpiredAt() && pq.size() < 15) {
                     break;
                 }
+
+                try {
+                    pq.poll();
+                    entry.value.close();
+                } catch (Exception e) {
+                    System.err.println("Error while closing value: " + e.getMessage());
+                }
+                map.remove(entry.getKey());
+
             }
         };
 
