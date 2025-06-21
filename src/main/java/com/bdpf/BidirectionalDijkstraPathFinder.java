@@ -76,7 +76,6 @@ public class BidirectionalDijkstraPathFinder {
             // return path1.concatReversePathsFinder(path2);
             // return path2.contactToValue(path1);
             return path2.contactToValue(path1);
-            // return path1.contactToValueReverse(path2);
         };
     };
     // UNREGISTERED
@@ -107,23 +106,6 @@ public class BidirectionalDijkstraPathFinder {
                     .iterator();
         };
 
-        // @Override
-        // public ResourceIterable<Relationship> getRelationships(PathFinder path) {
-        // Set<Relationship> uniqueRelationships = new HashSet<>();
-
-        // for (Relationship rel : path.getEndNode().getRelationships(Direction.BOTH)) {
-        // Node start = rel.getStartNode();
-        // Node end = rel.getEndNode();
-
-        // // Ensure only one direction is kept (OUTGOING)
-        // if (start.getId() < end.getId()) {
-        // uniqueRelationships.add(rel);
-        // }
-        // }
-
-        // return () -> uniqueRelationships.iterator();
-        // }
-
         @Override
         public AnyValue toValue(PathFinder path1, PathFinder path2) {
             return path2.contactToValue(path1);
@@ -140,11 +122,7 @@ public class BidirectionalDijkstraPathFinder {
             @Name("chainType") String chainType,
             @Name("timeoutSeconds") long timeoutSeconds) {
         storageExpirationSeconds = Math.max(storageExpirationSeconds, timeoutSeconds);
-        // Set<String> validChainTypes = Set.of("REGISTERED", "UNREGISTERED");
-        // if (!validChainTypes.contains(chainType)) {
-        // throw new IllegalArgumentException(
-        // "Invalid value for chainType. Accepted values are: " + validChainTypes);
-        // }
+
         Dijkstra dijkstra = new Dijkstra();
         CostEvaluator<Double> costEvaluator = (relationship, path) -> {
             int size = path.chain.getSize() + 1;

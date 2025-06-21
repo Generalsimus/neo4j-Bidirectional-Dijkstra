@@ -48,30 +48,11 @@ public class Dijkstra {
         @Override
         public void close() throws Exception {
             this.tx.close();
+            // this.db.
         }
     }
 
     private static final ExpiringMapStorage<String, DataStorage> storage = new ExpiringMapStorage<String, DataStorage>();
-
-    public DataStorage getCachedStorage(
-            GraphDatabaseService db,
-            Node startNode,
-            Node endNode,
-            String storageKey,
-            long storageExpirationSeconds,
-            CostEvaluator<Double> costEvaluator,
-            RelationshipFilter getRelationships,
-            RelationshipFilter getReverseRelationships) {
-        DataStorage storage = Dijkstra.storage.get(storageKey);
-        if (storage == null) {
-            storage = new DataStorage(db, startNode, endNode, costEvaluator, getRelationships,
-                    getReverseRelationships);
-            Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds);
-        } else {
-            Dijkstra.storage.updateExpirationTimeSeconds(storageKey, storageExpirationSeconds);
-        }
-        return storage;
-    }
 
     public static boolean isLessThanOrEqual(double a, double b) {
         double epsilon = 1e-6;
@@ -90,18 +71,18 @@ public class Dijkstra {
             RelationshipFilter getRelationships,
             RelationshipFilter getReverseRelationships,
             Log log) {
-        DataStorage storage = this.getCachedStorage(db, startNode, endNode, storageKey, storageExpirationSeconds,
-                costEvaluator, getRelationships,
-                getReverseRelationships);
-        // storage.lock();
-        // new DataStorage(startNode, endNode, costEvaluator, getRelationships,
-        // getReverseRelationships);
+        DataStorage storage = Dijkstra.storage.getAndRemove(storageKey);
+        if (storage == null) {
+            storage = new DataStorage(db, startNode, endNode, costEvaluator, getRelationships, getReverseRelationships);
+        }
+
         PriorityQueue<PathFinder> pq = storage.pq;
         LinkedList<AnyValue> currentKPaths = storage.currentKPaths;
 
         long timeoutAt = System.currentTimeMillis() + 1000 * timeoutSeconds;
 
         if (currentKPaths.size() >= k) {
+            Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds);
             return currentKPaths.stream()
                     .limit(k)
                     .map(path -> new ResponsePath(path));
@@ -124,67 +105,19 @@ public class Dijkstra {
                 }
                 continue;
             }
-            // if (!currentEntry.map.containsKey(currentEntry.getEndNode())
-            // // && !currentEntry.reverseMap.containsKey(currentEntry.getEndNode())
-            // ) {
-            // if (currentE</AnyValue>ntry.getEndNode() == startNode ||
-            // currentEntry.getEndNode() ==
-            // endNode) {
-            // continue;
-            // }
+
             currentEntry.map.put(currentEntry.getEndNode(), currentEntry);
-            // } else {
-            // // continue;
-            // }
 
             Iterable<Relationship> sortedRelationships = currentEntry.getRelationships();
-            // log.info(" GET REL::" + sortedRelationships. + ":::" +
-            // currentEntry.getEndNode().getProperty("phoneKey"));
-            // if (currentEntry.chain.getSize() == 0) {
-            // log.info("START" + (getRelationships == currentEntry.relationshipFilter));
-            // }
+
             for (Relationship rel : sortedRelationships) {
                 Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
 
-                // if (currentEntry.chain.getSize() == 0) {
-                // log.info("FROM:::" + currentEntry.getEndNode().getProperty("phoneKey") +
-                // "__TO:::"
-                // + neighbor.getProperty("phoneKey"));
-                // }
-                // if (currentEntry.chain.getSize() == 0) {
-                // log.info("BLO, " + currentEntry.isBlockNode(endNode) + ",LL:"
-                // + currentEntry.getEndNode().getProperty("phoneKey") + "EE"
-                // + neighbor.getProperty("phoneKey"));
-                // }
-                // if (currentEntry.isBlockNode(neighbor)) {
-                // continue;
-                // }
-                // // || (currentEntry.map.containsKey(neighbor) &&
-                // // currentEntry.reverseMap.containsKey(neighbor))
-                // // || reversePath != null && neighbor.equals(reversePath.chain.element.from)
-                // ) {
-                // // || (reversePath != null && reversePath.chain.element != null
-                // // && neighbor == reversePath.chain.element.from)
-
-                // continue;
-                // }
-
-                // || currentEntry.reverseMap.containsKey(neighbor)
-                // if(isLessThanOrEqual(prev, 0)){
-
-                // }
                 Double weight = costEvaluator.getCost(rel, currentEntry);
 
                 PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
-                // log.info("SIZE: "+newEntry.chain.getSize() + "__weight:::" +
-                // newEntry.getWeight());
-                // log.info("QQQQUE:::" + neighbor.getProperty("phoneKey")+" weight:::" +
-                // newEntry.getWeight() +" SIZE:"+ pq.size() +" CHAIN_SIZE:"+
-                // newEntry.chain.getSize());
-                // if (!currentEntry.map.containsKey(neighbor)) {
 
                 pq.add(newEntry);
-                // }
             }
 
         }
@@ -193,8 +126,8 @@ public class Dijkstra {
             return Stream.empty();
         }
 
+        Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds);
         return currentKPaths.stream().map(path -> new ResponsePath(path));
-
     }
 
     public void walkOn(PathFinder currentEntry, LinkedList<AnyValue> currentKPaths) {

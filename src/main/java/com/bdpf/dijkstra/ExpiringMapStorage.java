@@ -16,23 +16,25 @@ public class ExpiringMapStorage<K, V extends AutoCloseable> {
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
         Runnable task = () -> {
-            while (!pq.isEmpty()) {
-                ExpiringEntry<V, K> entry = pq.peek();
-                if (entry == null) {
-                    break;
-                }
-                if (System.currentTimeMillis() < entry.getExpiredAt() && pq.size() < 15) {
-                    break;
-                }
+            synchronized (this) {
+                while (!pq.isEmpty()) {
+                    ExpiringEntry<V, K> entry = pq.peek();
+                    if (entry == null) {
+                        break;
+                    }
+                    if (System.currentTimeMillis() < entry.getExpiredAt() && pq.size() < 15) {
+                        break;
+                    }
 
-                try {
                     pq.poll();
-                    entry.value.close();
-                } catch (Exception e) {
-                    System.err.println("Error while closing value: " + e.getMessage());
-                }
-                map.remove(entry.getKey());
+                    try {
+                        entry.value.close();
+                    } catch (Exception e) {
+                        System.err.println("Error while closing value: " + e.getMessage());
+                    }
+                    map.remove(entry.getKey());
 
+                }
             }
         };
 
@@ -43,16 +45,33 @@ public class ExpiringMapStorage<K, V extends AutoCloseable> {
         if (expirationTimeSeconds == 0) {
             return;
         }
-        ExpiringEntry<V, K> entry = new ExpiringEntry<V, K>(value, key, expirationTimeSeconds);
-
-        pq.add(entry);
-        map.put(key, entry);
+        synchronized (this) {
+            ExpiringEntry<V, K> entry = new ExpiringEntry<V, K>(value, key, expirationTimeSeconds);
+            pq.add(entry);
+            map.put(key, entry);
+        }
     }
 
     public void updateExpirationTimeSeconds(K key, long expirationTimeSeconds) {
-        ExpiringEntry<V, K> entry = this.map.get(key);
-        if (entry != null) {
-            entry.updateExpirationTimeSeconds(expirationTimeSeconds);
+        synchronized (this) {
+            ExpiringEntry<V, K> entry = this.map.get(key);
+            if (entry != null) {
+                pq.remove(entry);
+                map.remove(key);
+                this.put(key, entry.value, expirationTimeSeconds);
+            }
+        }
+    }
+
+    public V getAndRemove(K key) {
+        synchronized (this) {
+            ExpiringEntry<V, K> entry = this.map.get(key);
+            if (entry == null) {
+                return null;
+            }
+            pq.remove(entry);
+            map.remove(key);
+            return entry.value;
         }
     }
 
