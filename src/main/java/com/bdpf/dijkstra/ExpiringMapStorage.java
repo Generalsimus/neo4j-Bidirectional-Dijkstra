@@ -4,10 +4,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ExpiringMapStorage<K, V extends AutoCloseable> {
+public class ExpiringMapStorage<K, V extends Closeable> {
 
     private final PriorityBlockingQueue<ExpiringEntry<V, K>> pq = new PriorityBlockingQueue<>();
     private final ConcurrentHashMap<K, ExpiringEntry<V, K>> map = new ConcurrentHashMap<>();
@@ -19,20 +19,15 @@ public class ExpiringMapStorage<K, V extends AutoCloseable> {
             synchronized (this) {
                 while (!pq.isEmpty()) {
                     ExpiringEntry<V, K> entry = pq.peek();
-                    if (entry == null) {
+                    if (entry == null || entry.isLocked()) {
                         break;
                     }
-                    if (System.currentTimeMillis() < entry.getExpiredAt() && pq.size() < 15) {
+                    if (System.currentTimeMillis() < entry.getExpiredAt() && pq.size() < 20) {
                         break;
                     }
 
-                    pq.poll();
-                    try {
-                        entry.value.close();
-                    } catch (Exception e) {
-                        System.err.println("Error while closing value: " + e.getMessage());
-                    }
-                    map.remove(entry.getKey());
+                    this.remove(entry.key);
+                    entry.value.close();
 
                 }
             }
@@ -41,53 +36,54 @@ public class ExpiringMapStorage<K, V extends AutoCloseable> {
         scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
     }
 
-    public void put(K key, V value, long expirationTimeSeconds) {
+    public ExpiringEntry<V, K> put(K key, V value, long expirationTimeSeconds) {
+        this.remove(key);
+        ExpiringEntry<V, K> entry = new ExpiringEntry<V, K>(value, key, expirationTimeSeconds);
         if (expirationTimeSeconds == 0) {
-            return;
+            return entry;
         }
         synchronized (this) {
-            ExpiringEntry<V, K> entry = new ExpiringEntry<V, K>(value, key, expirationTimeSeconds);
             pq.add(entry);
             map.put(key, entry);
+        }
+        return entry;
+    }
+
+    public void remove(K key) {
+        synchronized (this) {
+            ExpiringEntry<V, K> entry = this.map.get(key);
+            if (entry != null) {
+                pq.remove(entry);
+                map.remove(key);
+            }
         }
     }
 
     public void updateExpirationTimeSeconds(K key, long expirationTimeSeconds) {
         synchronized (this) {
             ExpiringEntry<V, K> entry = this.map.get(key);
+            this.remove(key);
             if (entry != null) {
-                pq.remove(entry);
-                map.remove(key);
                 this.put(key, entry.value, expirationTimeSeconds);
             }
         }
     }
 
-    public V getAndRemove(K key) {
-        synchronized (this) {
-            ExpiringEntry<V, K> entry = this.map.get(key);
-            if (entry == null) {
-                return null;
-            }
-            pq.remove(entry);
-            map.remove(key);
-            return entry.value;
-        }
-    }
-
-    public V get(K key) {
+    public ExpiringEntry<V, K> get(K key) {
         ExpiringEntry<V, K> entry = this.map.get(key);
         if (entry == null) {
             return null;
         }
 
-        return entry.value;
+        return entry;
     }
 
-    private static class ExpiringEntry<V, K> implements Comparable<ExpiringEntry<V, K>> {
+    public static class ExpiringEntry<V, K> implements Comparable<ExpiringEntry<V, K>> {
         private final V value;
         private final K key;
         private long expiredAt;
+
+        private final ReentrantLock lock = new ReentrantLock(true);
 
         public ExpiringEntry(V value, K key, long expirationTimeSeconds) {
             this.value = value;
@@ -101,6 +97,22 @@ public class ExpiringMapStorage<K, V extends AutoCloseable> {
 
         public void updateExpirationTimeSeconds(long expirationTimeSeconds) {
             this.expiredAt = System.currentTimeMillis() + 1000 * expirationTimeSeconds;
+        }
+
+        public V getValue() {
+            return this.value;
+        }
+
+        public void lock() {
+            this.lock.lock();
+        }
+
+        public void unlock() {
+            this.lock.unlock();
+        }
+
+        public boolean isLocked() {
+            return this.lock.isLocked();
         }
 
         public K getKey() {

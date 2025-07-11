@@ -6,12 +6,14 @@ import org.neo4j.graphdb.*;
 import org.neo4j.logging.Log;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.neo4j.values.AnyValue;
 
 public class Dijkstra {
 
-    public class DataStorage implements AutoCloseable {
+    public class DataStorage implements Closeable {
         Node startNode;
         Node endNode;
 
@@ -46,9 +48,8 @@ public class Dijkstra {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() {
             this.tx.close();
-            // this.db.
         }
     }
 
@@ -71,63 +72,76 @@ public class Dijkstra {
             RelationshipFilter getRelationships,
             RelationshipFilter getReverseRelationships,
             Log log) {
-        DataStorage storage = Dijkstra.storage.getAndRemove(storageKey);
-        if (storage == null) {
-            storage = new DataStorage(db, startNode, endNode, costEvaluator, getRelationships, getReverseRelationships);
+
+        ExpiringMapStorage.ExpiringEntry<DataStorage, String> storageEntry = Dijkstra.storage.get(storageKey);
+        if (storageEntry == null) {
+            storageEntry = Dijkstra.storage.put(
+                    storageKey,
+                    new DataStorage(db, startNode, endNode, costEvaluator, getRelationships, getReverseRelationships),
+                    storageExpirationSeconds);
+        } else {
+            Dijkstra.storage.updateExpirationTimeSeconds(storageKey, timeoutSeconds);
         }
+        storageEntry.lock();
+        try {
+            DataStorage storage = storageEntry.getValue();
 
-        PriorityQueue<PathFinder> pq = storage.pq;
-        LinkedList<AnyValue> currentKPaths = storage.currentKPaths;
+            PriorityQueue<PathFinder> pq = storage.pq;
+            LinkedList<AnyValue> currentKPaths = storage.currentKPaths;
 
-        long timeoutAt = System.currentTimeMillis() + 1000 * timeoutSeconds;
+            long timeoutAt = System.currentTimeMillis() + 1000 * timeoutSeconds;
 
-        if (currentKPaths.size() >= k) {
-            Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds);
-            return currentKPaths.stream()
-                    .limit(k)
-                    .map(path -> new ResponsePath(path));
-        }
-        double minWeight = 0;
-        while (!pq.isEmpty() && System.currentTimeMillis() < timeoutAt) {
-            PathFinder currentEntry = pq.poll();
-            PathFinder reversePath = currentEntry.getFromReverseMap(currentEntry.getEndNode());
+            if (currentKPaths.size() >= k) {
+                return currentKPaths.stream()
+                        .limit(k)
+                        .map(path -> new ResponsePath(path));
+            }
+            double minWeight = 0;
+            while (!pq.isEmpty() && System.currentTimeMillis() < timeoutAt) {
 
-            if (reversePath != null) {
-                double currentWeight = currentEntry.getWeight() + reversePath.getWeight();
+                PathFinder currentEntry = pq.poll();
+                PathFinder reversePath = currentEntry.getFromReverseMap(currentEntry.getEndNode());
 
-                if (isLessThanOrEqual(minWeight, currentWeight)) {
-                    minWeight = currentWeight;
-                    currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry, reversePath));
-                    if (currentKPaths.size() >= k) {
-                        return currentKPaths.stream()
-                                .map(path -> new ResponsePath(path));
+                if (reversePath != null) {
+                    double currentWeight = currentEntry.getWeight() + reversePath.getWeight();
+
+                    if (isLessThanOrEqual(minWeight, currentWeight)) {
+                        minWeight = currentWeight;
+                        currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry, reversePath));
+                        if (currentKPaths.size() >= k) {
+                            return currentKPaths.stream()
+                                    .map(path -> new ResponsePath(path));
+                        }
                     }
+                    continue;
                 }
-                continue;
+
+                currentEntry.map.put(currentEntry.getEndNode(), currentEntry);
+
+                Iterable<Relationship> sortedRelationships = currentEntry.getRelationships();
+
+                for (Relationship rel : sortedRelationships) {
+                    Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
+
+                    Double weight = costEvaluator.getCost(rel, currentEntry);
+
+                    PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
+
+                    pq.add(newEntry);
+                }
+
             }
 
-            currentEntry.map.put(currentEntry.getEndNode(), currentEntry);
-
-            Iterable<Relationship> sortedRelationships = currentEntry.getRelationships();
-
-            for (Relationship rel : sortedRelationships) {
-                Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
-
-                Double weight = costEvaluator.getCost(rel, currentEntry);
-
-                PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
-
-                pq.add(newEntry);
+            if (currentKPaths.isEmpty()) {
+                Dijkstra.storage.remove(storageKey);
+                storage.close();
+                return Stream.empty();
             }
 
+            return currentKPaths.stream().map(path -> new ResponsePath(path));
+        } finally {
+            storageEntry.unlock();
         }
-
-        if (currentKPaths.isEmpty()) {
-            return Stream.empty();
-        }
-
-        Dijkstra.storage.put(storageKey, storage, storageExpirationSeconds);
-        return currentKPaths.stream().map(path -> new ResponsePath(path));
     }
 
     public void walkOn(PathFinder currentEntry, LinkedList<AnyValue> currentKPaths) {

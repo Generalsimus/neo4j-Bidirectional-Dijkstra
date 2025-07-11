@@ -21,7 +21,7 @@ import com.bdpf.dijkstra.ResponsePath;
 
 // CALL com.bdpf.shortestPath("key", 2, startNode, endNode, 1, "REGISTERED", 10) YIELD paths
 // RETURN [path IN paths | path.start.phoneKey + "_" + path.end.phoneKey] AS phoneChain;
-
+// ""
 // CALL com.bdpf.shortestPath("key", 2, startNode, endNode, 1, "REGISTERED", 10) YIELD paths
 // RETURN paths;
 
