@@ -97,7 +97,7 @@ public class Dijkstra {
                         .map(path -> new ResponsePath(path));
             }
             double minWeight = 0;
-            while (!pq.isEmpty() && System.currentTimeMillis() < timeoutAt) {
+            while (!pq.isEmpty() && System.currentTimeMillis() < timeoutAt && !Dijkstra.storage.isHeapAboveLimit()) {
 
                 PathFinder currentEntry = pq.poll();
                 PathFinder reversePath = currentEntry.getFromReverseMap(currentEntry.getEndNode());

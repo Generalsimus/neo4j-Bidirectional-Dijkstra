@@ -19,10 +19,14 @@ public class ExpiringMapStorage<K, V extends Closeable> {
             synchronized (this) {
                 while (!pq.isEmpty()) {
                     ExpiringEntry<V, K> entry = pq.peek();
+                    if (this.isHeapAboveLimit()) {
+                        this.updateExpirationTimeSeconds(entry.key, 0);
+                        continue;
+                    }
                     if (entry == null || entry.isLocked()) {
                         break;
                     }
-                    if (System.currentTimeMillis() < entry.getExpiredAt() && pq.size() < 20) {
+                    if (System.currentTimeMillis() < entry.getExpiredAt()) {
                         break;
                     }
 
@@ -34,6 +38,13 @@ public class ExpiringMapStorage<K, V extends Closeable> {
         };
 
         scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
+    }
+
+    private final long maxHeap = Runtime.getRuntime().maxMemory();
+
+    public boolean isHeapAboveLimit() {
+        long used = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        return ((double) used / maxHeap) > 0.90;
     }
 
     public ExpiringEntry<V, K> put(K key, V value, long expirationTimeSeconds) {
