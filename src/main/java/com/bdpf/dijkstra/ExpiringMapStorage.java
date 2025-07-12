@@ -16,28 +16,32 @@ public class ExpiringMapStorage<K, V extends Closeable> {
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
         Runnable task = () -> {
-            synchronized (this) {
-                while (!pq.isEmpty()) {
-                    ExpiringEntry<V, K> entry = pq.peek();
-                    if (this.isHeapAboveLimit()) {
-                        this.updateExpirationTimeSeconds(entry.key, 0);
-                        continue;
-                    }
-                    if (entry == null || entry.isLocked()) {
-                        break;
-                    }
-                    if (System.currentTimeMillis() < entry.getExpiredAt()) {
-                        break;
-                    }
-
-                    this.remove(entry.key);
-                    entry.value.close();
-
-                }
-            }
+            this.runCleaner();
         };
 
         scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
+    }
+
+    public void runCleaner() {
+        synchronized (this) {
+            while (!pq.isEmpty()) {
+                ExpiringEntry<V, K> entry = pq.peek();
+                if (this.isHeapAboveLimit()) {
+                    this.updateExpirationTimeSeconds(entry.key, 0);
+                    continue;
+                }
+                if (entry == null || entry.isLocked()) {
+                    break;
+                }
+                if (System.currentTimeMillis() < entry.getExpiredAt()) {
+                    break;
+                }
+
+                this.remove(entry.key);
+                entry.value.close();
+
+            }
+        }
     }
 
     private final long maxHeap = Runtime.getRuntime().maxMemory();
