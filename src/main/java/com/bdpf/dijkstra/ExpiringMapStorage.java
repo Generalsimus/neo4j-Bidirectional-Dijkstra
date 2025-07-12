@@ -6,6 +6,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.ConcurrentHashMap;
+import org.neo4j.logging.Log;
 
 public class ExpiringMapStorage<K, V extends Closeable> {
 
@@ -26,15 +27,15 @@ public class ExpiringMapStorage<K, V extends Closeable> {
         synchronized (this) {
             while (!pq.isEmpty()) {
                 ExpiringEntry<V, K> entry = pq.peek();
-                if (this.isHeapAboveLimit()) {
-                    this.updateExpirationTimeSeconds(entry.key, 0);
+                if (entry == null) {
+                    break;
+                }
+                if (System.currentTimeMillis() < entry.getExpiredAt() && !this.isHeapAboveLimit()) {
+                    break;
+                }
+                if (entry.isLocked()) {
+                    this.updateExpirationTimeSeconds(entry.key, 2);
                     continue;
-                }
-                if (entry == null || entry.isLocked()) {
-                    break;
-                }
-                if (System.currentTimeMillis() < entry.getExpiredAt()) {
-                    break;
                 }
 
                 this.remove(entry.key);
@@ -47,8 +48,9 @@ public class ExpiringMapStorage<K, V extends Closeable> {
     private final long maxHeap = Runtime.getRuntime().maxMemory();
 
     public boolean isHeapAboveLimit() {
-        long used = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-        return ((double) used / maxHeap) > 0.90;
+        Runtime runtime = Runtime.getRuntime();
+        long used = runtime.totalMemory() - runtime.freeMemory();
+        return ((double) used / maxHeap) > 0.95;
     }
 
     public ExpiringEntry<V, K> put(K key, V value, long expirationTimeSeconds) {
