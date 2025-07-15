@@ -126,7 +126,7 @@ public class Dijkstra {
                         .map(path -> new ResponsePath(path));
             }
             double minWeight = 0;
-            while (!pq.isEmpty() && System.currentTimeMillis() < timeoutAt && !Dijkstra.storage.isHeapAboveLimit()) {
+            while (!pq.isEmpty() && System.currentTimeMillis() < timeoutAt && !Dijkstra.storage.isHeapAboveLimit(0.95)) {
 
                 PathFinder currentEntry = pq.poll();
                 PathFinder reversePath = currentEntry.getFromReverseMap(currentEntry.getEndNode());
@@ -163,7 +163,6 @@ public class Dijkstra {
 
             if (currentKPaths.isEmpty()) {
                 Dijkstra.storage.remove(storageKey);
-                Dijkstra.storage.runCleaner();
                 storage.close();
                 return Stream.empty();
             }
@@ -171,6 +170,7 @@ public class Dijkstra {
             return currentKPaths.stream().map(path -> new ResponsePath(path));
         } finally {
             storageEntry.unlock();
+            Dijkstra.storage.runCleaner();
         }
     }
 
