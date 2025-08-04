@@ -20,7 +20,7 @@ public class ExpiringMapStorage<K, V extends Closeable> {
             this.runCleaner();
         };
 
-        scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
+        // scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
     }
 
     public void runCleaner() {
@@ -38,7 +38,6 @@ public class ExpiringMapStorage<K, V extends Closeable> {
                 if (System.currentTimeMillis() < entry.getExpiredAt() && !this.isHeapAboveLimit(0.80)) {
                     break;
                 }
-
                 this.remove(entry.key);
                 entry.value.close();
 

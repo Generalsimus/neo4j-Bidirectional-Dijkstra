@@ -1,8 +1,7 @@
 package com.bdpf.dijkstra;
 
 import java.util.*;
-
-import org.neo4j.cypher.internal.expressions.functions.E;
+ 
 
 public class Linker<E> implements Iterable<E> {
     private Linker<E> before; // Points to the previous node

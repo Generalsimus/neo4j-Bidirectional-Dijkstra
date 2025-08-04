@@ -35,10 +35,7 @@ public class BidirectionalDijkstraPathFinder {
 
     @Context
     public Log log;
-    // public BidirectionalDijkstraPathFinder {
 
-    // }
-    // REGISTERED
     public static RelationshipFilter getRegisteredRelationships = new RelationshipFilter() {
         @Override
         public Iterable<Relationship> getRelationships(PathFinder path) {
@@ -126,8 +123,9 @@ public class BidirectionalDijkstraPathFinder {
         Dijkstra dijkstra = new Dijkstra();
         CostEvaluator<Double> costEvaluator = (relationship, path) -> {
             int size = path.chain.getSize() + 1;
-            double optimalWeight = ((Number) relationship.getProperty("weight", 1)).doubleValue();
-            return (size * 100) + optimalWeight;
+            return ((double) size);
+            // double optimalWeight = ((Number) relationship.getProperty("weight", 1)).doubleValue();
+            // return (size * 100) + optimalWeight;
         };
         if (chainType.equals("REGISTERED")) {
             return dijkstra.find(
