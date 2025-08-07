@@ -71,7 +71,34 @@ public class PathFinder {
                 return true;
             }
         }
+        // if (this.chain.getSize() == 0) {
         return this.endNode.equals(node);
+        // }
+        // return false;
+    }
+
+    public boolean isBlockNode2(PathFinder point) {
+        Iterator<Connection> iterator = point.chain.iterator();
+
+        while (iterator.hasNext()) {
+            Connection current = iterator.next();
+            if (this.isBlockNode(current.start)) {
+                return true;
+            }
+            // if (this.isBlockNode(current.end)) {
+            //     return true;
+            // }
+            // Connection current = iterator.next();
+            // if (current.start.equals(node)) {
+            // return true;
+            // }
+        }
+        
+        // if (this.chain.getSize() == 0) {
+        // return this.endNode.equals(node);
+        // }
+        return false;
+        // return this.isBlockNode(point.getEndNode());
     }
 
     public ListValue contactToValue(PathFinder reverse) {

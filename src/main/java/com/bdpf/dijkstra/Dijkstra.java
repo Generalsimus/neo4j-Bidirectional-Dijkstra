@@ -49,7 +49,7 @@ public class Dijkstra {
             this.pq.add(endEntry);
 
             this.forwardMap.put(startId, startEntry);
-            // this.backForwardMap.put(startId, endEntry);
+            this.backForwardMap.put(startId, endEntry);
 
             // Map<Node, PathFinder> map,
             // Map<Node, PathFinder> reverseMap,
@@ -155,34 +155,50 @@ public class Dijkstra {
                     !Dijkstra.storage.isHeapAboveLimit(0.95) && currentEntry != null) {
 
                 PathFinder reverseMapPath = currentEntry.reverseMap.get(currentEntry.getId());
-                if (reverseMapPath != null || currentEntry.map.containsKey(currentEntry.getId())) {
-                    continue;
-                }
-
-                // if (reversePath != null) {
-                // currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry,
-                // reversePath));
-                // // continue;
+                // if (reverseMapPath != null && currentEntry.chain.getSize() != 0) {
+                // continue;
                 // }
 
-                currentEntry.map.put(currentEntry.getId(), currentEntry);
-                Iterable<Relationship> sortedRelationships = currentEntry.relationshipFilter
+                if (reverseMapPath == null) {
+                    // currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry,
+                    // reverseMapPath));
+                    currentEntry.map.put(currentEntry.getId(), currentEntry);
+                }
+
+                // currentEntry.map.put(currentEntry.getId(), currentEntry);
+                Iterable<Relationship> filteredRelationships = currentEntry.relationshipFilter
                         .getRelationships(currentEntry);
-                for (Relationship rel : sortedRelationships) {
+
+                for (Relationship rel : filteredRelationships) {
                     Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
+
                     long relId = this.getRelationshipId(currentEntry.getEndNode().getId(), neighbor.getId());
                     Double weight = costEvaluator.getCost(rel, currentEntry);
                     PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor, relId);
                     PathFinder reversePath = currentEntry.reverseMap.get(relId);
-                    if (reversePath != null) {
-                        currentKPaths.add(newEntry.relationshipFilter.toValue(newEntry, reversePath));
-                        // currentKPaths.add(reversePath.relationshipFilter.toValue(reversePath,
-                        // currentEntry));
+
+                    if (currentEntry.isBlockNode(neighbor)) {
                         continue;
                     }
-                    // if (!currentEntry.map.containsKey(relId)) {
+                    if (reversePath != null) {
+
+                        if (!reversePath.isBlockNode2(currentEntry)) {
+                            currentKPaths.add(newEntry.relationshipFilter.toValue(newEntry, reversePath));
+                            // currentEntry.reverseMap.remove(relId);
+
+                        }
+
+                        // if (currentEntry.isBlockNode((neighbor)) || reversePath.isBlockNode(null)) {
+                        // continue;
+
+                        // }
+                        // // currentKPaths.add(reversePath.relationshipFilter.toValue(reversePath,
+                        // // currentEntry));
+                        continue;
+                        // }
+                        // // if(){
+                    }
                     pq.add(newEntry);
-                    // }
                 }
                 // minWeight = this.walkOn(
                 // log,
