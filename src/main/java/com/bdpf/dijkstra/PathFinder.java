@@ -6,6 +6,7 @@ import org.neo4j.kernel.impl.util.ValueUtils;
 import org.neo4j.values.virtual.ListValueBuilder;
 import org.neo4j.values.AnyValue;
 import org.neo4j.values.virtual.ListValue;
+import org.neo4j.kernel.impl.util.ValueUtils;
 import java.util.*;
 
 public class PathFinder {
@@ -78,22 +79,25 @@ public class PathFinder {
     }
 
     public boolean isBlockNode2(PathFinder point) {
-        Iterator<Connection> iterator = point.chain.iterator();
+        Iterator<Connection> iterator = this.chain.iterator();
 
         while (iterator.hasNext()) {
-            Connection current = iterator.next();
-            if (this.isBlockNode(current.start)) {
-                return true;
+            while (iterator.hasNext()) {
+                Connection current = iterator.next();
+                if (point.isBlockNode(current.start)) {
+                    // ;
+                    return true;
+                }
             }
             // if (this.isBlockNode(current.end)) {
-            //     return true;
+            // return true;
             // }
             // Connection current = iterator.next();
             // if (current.start.equals(node)) {
             // return true;
             // }
         }
-        
+
         // if (this.chain.getSize() == 0) {
         // return this.endNode.equals(node);
         // }
@@ -103,8 +107,7 @@ public class PathFinder {
 
     public ListValue contactToValue(PathFinder reverse) {
         Linker<AnyValue> newChain = new Linker<>();
-        ListValueBuilder builder = ListValueBuilder.newListBuilder(this.chain.getSize() +
-                reverse.chain.getSize());
+        ListValueBuilder builder = ListValueBuilder.newListBuilder(this.chain.getSize() + reverse.chain.getSize());
 
         for (Connection chainRel : this.chain) {
             newChain = newChain.push(chainRel.toValue());
@@ -113,6 +116,7 @@ public class PathFinder {
         for (AnyValue el : newChain) {
             builder.add(el);
         }
+
         for (Connection chainRel : reverse.chain) {
 
             builder.add(chainRel.toReversedValue());

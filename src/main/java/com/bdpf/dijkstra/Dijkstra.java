@@ -42,9 +42,9 @@ public class Dijkstra {
             long startId = Dijkstra.getRelationshipId(this.startNode.getId(), this.endNode.getId());
 
             PathFinder startEntry = new PathFinder(this.forwardMap, this.backForwardMap, this.startNode, costEvaluator,
-                    getRelationships, -1);
+                    getRelationships, startId);
             PathFinder endEntry = new PathFinder(this.backForwardMap, this.forwardMap, this.endNode, costEvaluator,
-                    getReverseRelationships, -2);
+                    getReverseRelationships, startId);
             this.pq.add(startEntry);
             this.pq.add(endEntry);
 
@@ -150,22 +150,54 @@ public class Dijkstra {
             }
             double minWeight = Double.NEGATIVE_INFINITY;
             PathFinder currentEntry = pq.poll();
+            // int iss = 0;
             // PathFinder backForwardEntry = backForwardPq.poll();
+            // double minWeight = Double.NEGATIVE_INFINITY;
             while ((currentKPaths.size() < k && System.currentTimeMillis() < timeoutAt) &&
                     !Dijkstra.storage.isHeapAboveLimit(0.95) && currentEntry != null) {
+                // iss++;
 
+                // if (iss > 15) {
+                // return currentKPaths.stream().map(path -> new ResponsePath(path));
+                // }
                 PathFinder reverseMapPath = currentEntry.reverseMap.get(currentEntry.getId());
                 // if (reverseMapPath != null && currentEntry.chain.getSize() != 0) {
                 // continue;
                 // }
 
-                if (reverseMapPath == null) {
-                    // currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry,
-                    // reverseMapPath));
-                    currentEntry.map.put(currentEntry.getId(), currentEntry);
-                }
+                log.info("111: " + (reverseMapPath != null));
+                log.info("id: " + currentEntry.getId());
+                log.info("222: " + currentEntry.reverseMap.containsKey(currentEntry.getId()));
+                log.info("to1: " + currentEntry.reverseMap.keySet());
+                log.info("to2: " + currentEntry.map.keySet());
 
-                // currentEntry.map.put(currentEntry.getId(), currentEntry);
+                log.info("to3: " + currentEntry.getEndNode().getProperty("phoneKey"));
+                log.info("mpp4: " + currentEntry.map.containsKey(currentEntry.getId()));
+
+                if (reverseMapPath != null) {
+                    // if (!currentEntry.isBlockNode2(reverseMapPath)) {
+                    if (isLessThanOrEqual(minWeight, reverseMapPath.getWeight())) {
+                        currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry, reverseMapPath));
+                        minWeight = reverseMapPath.getWeight();
+                    }
+                    continue;
+
+                }
+                // if (!currentEntry.map.containsKey(currentEntry.getId())) {
+
+                // // currentEntry.reverseMap.remove(currentEntry.getId());s
+                // continue;
+                // }
+                // if (!currentEntry.map.containsKey(currentEntry.getId())) {
+                // continue;
+                // }
+
+                // currentEntry.map.remove(currentEntry.getId());
+                // currentEntry.reverseMap.remove(currentEntry.getId());
+
+                // currentEntry.reverseMap.remove(currentEntry.getId());v
+                currentEntry.map.put(currentEntry.getId(), currentEntry);
+
                 Iterable<Relationship> filteredRelationships = currentEntry.relationshipFilter
                         .getRelationships(currentEntry);
 
@@ -175,56 +207,18 @@ public class Dijkstra {
                     long relId = this.getRelationshipId(currentEntry.getEndNode().getId(), neighbor.getId());
                     Double weight = costEvaluator.getCost(rel, currentEntry);
                     PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor, relId);
-                    PathFinder reversePath = currentEntry.reverseMap.get(relId);
-
+                    // if()
+                    // currentEntry.map.remove(newEntry.getId());s
                     if (currentEntry.isBlockNode(neighbor)) {
                         continue;
                     }
-                    if (reversePath != null) {
-
-                        if (!reversePath.isBlockNode2(currentEntry)) {
-                            currentKPaths.add(newEntry.relationshipFilter.toValue(newEntry, reversePath));
-                            // currentEntry.reverseMap.remove(relId);
-
-                        }
-
-                        // if (currentEntry.isBlockNode((neighbor)) || reversePath.isBlockNode(null)) {
-                        // continue;
-
-                        // }
-                        // // currentKPaths.add(reversePath.relationshipFilter.toValue(reversePath,
-                        // // currentEntry));
-                        continue;
-                        // }
-                        // // if(){
-                    }
+                    // if (!currentEntry.reverseMap.containsKey(relId)) {
+                    // }
                     pq.add(newEntry);
+                    // }
                 }
-                // minWeight = this.walkOn(
-                // log,
-                // forwardEntry,
-                // forwardMap,
-                // backForwardMap,
-                // forwardPq,
-                // currentKPaths,
-                // costEvaluator,
-                // getRelationships,
-                // minWeight,
-                // k);
-                // minWeight = this.walkOn(
-                // log,
-                // backForwardEntry,
-                // backForwardMap,
-                // forwardMap,
-                // backForwardPq,
-                // currentKPaths,
-                // costEvaluator,
-                // getReverseRelationships,
-                // minWeight,
-                // k);
 
                 currentEntry = pq.poll();
-                // backForwardEntry = backForwardPq.poll();
             }
 
             if (currentKPaths.isEmpty()) {
