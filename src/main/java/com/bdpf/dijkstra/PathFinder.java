@@ -78,28 +78,30 @@ public class PathFinder {
         // return false;
     }
 
-    public boolean isBlockNode2(PathFinder point) {
+    public boolean isBlockNode2(Node node) {
         Iterator<Connection> iterator = this.chain.iterator();
 
         while (iterator.hasNext()) {
-            while (iterator.hasNext()) {
-                Connection current = iterator.next();
-                if (point.isBlockNode(current.start)) {
-                    // ;
-                    return true;
-                }
+            Connection current = iterator.next();
+            if (current.end.equals(node)) {
+                return true;
             }
-            // if (this.isBlockNode(current.end)) {
-            // return true;
-            // }
-            // Connection current = iterator.next();
-            // if (current.start.equals(node)) {
-            // return true;
-            // }
         }
+        // if (this.isBlockNode(current.end)) {
+        // return true;
+        // }
+        // Connection current = iterator.next();
+        // if (current.start.equals(node)) {
+        // return true;
+        // }
+        // return false
+        // }
 
         // if (this.chain.getSize() == 0) {
         // return this.endNode.equals(node);
+        // }
+        // if (this.chain.getSize() == 0) {
+            // return this.endNode.equals(node);
         // }
         return false;
         // return this.isBlockNode(point.getEndNode());

@@ -123,10 +123,16 @@ public class BidirectionalDijkstraPathFinder {
         Dijkstra dijkstra = new Dijkstra();
         CostEvaluator<Double> costEvaluator = (relationship, path) -> {
             int size = path.chain.getSize() + 1;
-            return ((double) size);
-            // double optimalWeight = ((Number) relationship.getProperty("weight", 1)).doubleValue();
-            // return (size * 100) + optimalWeight;
+            double optimalWeight = ((Number) relationship.getProperty("weight", 1)).doubleValue();
+            return (size * 100) + optimalWeight;
         };
+        // CostEvaluator<Double> costEvaluator = (relationship, path) -> {
+        // int size = path.chain.getSize() + 1;
+        // return ((double) size);
+        // // double optimalWeight = ((Number) relationship.getProperty("weight",
+        // 1)).doubleValue();
+        // // return (size * 100) + optimalWeight;
+        // };
         if (chainType.equals("REGISTERED")) {
             return dijkstra.find(
                     db,
