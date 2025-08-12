@@ -12,10 +12,10 @@ import java.util.*;
 public class PathFinder {
     Map<Long, PathFinder> map;
     Map<Long, PathFinder> reverseMap;
+    Set<Long> visitedNodes;
+    Set<Long> reverseVisitedNodes;
     PathFinder endPath;
 
-    // long id = 0;
-    // long reverseId = 0;
     //
     Node endNode;
 
@@ -30,7 +30,9 @@ public class PathFinder {
             Map<Long, PathFinder> reverseMap,
             Node endNode,
             CostEvaluator<Double> costEvaluator,
-            RelationshipFilter relationshipFilter) {
+            RelationshipFilter relationshipFilter,
+            Set<Long> visitedNodes,
+            Set<Long> reverseVisitedNodes) {
         this.map = map;
         this.reverseMap = reverseMap;
         // this.id = id;
@@ -38,20 +40,29 @@ public class PathFinder {
         this.endNode = endNode;
         this.costEvaluator = costEvaluator;
         this.relationshipFilter = relationshipFilter;
+        this.visitedNodes = visitedNodes;
+        this.reverseVisitedNodes = reverseVisitedNodes;
         this.chain = new Linker<Connection>();
+
+        // this.visitedNodes.add(endNode.getId());
     }
 
     PathFinder(Map<Long, PathFinder> map,
             Map<Long, PathFinder> reverseMap, Node endNode, Double weight, Linker<Connection> chain,
             CostEvaluator<Double> costEvaluator,
-            RelationshipFilter relationshipFilter) {
+            RelationshipFilter relationshipFilter,
+            Set<Long> visitedNodes,
+            Set<Long> reverseVisitedNodes) {
         this.map = map;
         this.reverseMap = reverseMap;
         this.endNode = endNode;
         this.weight = weight;
         this.costEvaluator = costEvaluator;
         this.relationshipFilter = relationshipFilter;
+        this.visitedNodes = visitedNodes;
+        this.reverseVisitedNodes = reverseVisitedNodes;
         this.chain = chain;
+        // this.visitedNodes.add(endNode.getId());
         // this.id = id;
     }
 
@@ -78,12 +89,12 @@ public class PathFinder {
         // return false;
     }
 
-    public boolean isBlockNode2(Node node) {
-        Iterator<Connection> iterator = this.chain.iterator();
+    public boolean isBlockNode2(PathFinder path) {
+        Iterator<Connection> iterator = path.chain.iterator();
 
         while (iterator.hasNext()) {
             Connection current = iterator.next();
-            if (current.end.equals(node)) {
+            if (this.isBlockNode(current.start)) {
                 return true;
             }
         }
@@ -109,19 +120,33 @@ public class PathFinder {
 
     public ListValue contactToValue(PathFinder reverse) {
         Linker<AnyValue> newChain = new Linker<>();
-        ListValueBuilder builder = ListValueBuilder.newListBuilder(this.chain.getSize() + reverse.chain.getSize());
+        int chainFullSize = this.chain.getSize() + reverse.chain.getSize();
+        boolean neeRemoveConnectionElement = this.chain.getSize() != 0 && reverse.chain.getSize() != 0;
+        if (neeRemoveConnectionElement) {
+            chainFullSize = chainFullSize - 1;
+        }
+        ListValueBuilder builder = ListValueBuilder.newListBuilder(chainFullSize);
 
         for (Connection chainRel : this.chain) {
-            newChain = newChain.push(chainRel.toValue());
+            if (!neeRemoveConnectionElement) {
+                newChain = newChain.push(chainRel.toValue());
+            }
+            neeRemoveConnectionElement = false;
         }
+        // if (neeRemoveConnectionElement) {
+        // newChain = newChain.before;
+        // }
 
         for (AnyValue el : newChain) {
             builder.add(el);
         }
+        // boolean ignoreConnectionLink = this.chain.getSize() != 0 &&
+        // reverse.chain.getSize() != 0;
 
         for (Connection chainRel : reverse.chain) {
 
             builder.add(chainRel.toReversedValue());
+
         }
 
         return builder.build();
@@ -170,7 +195,9 @@ public class PathFinder {
                 this.weight + relCost,
                 this.chain.push(new Connection(this.getEndNode(), rel, newEndNode, relCost)),
                 this.costEvaluator,
-                this.relationshipFilter);
+                this.relationshipFilter,
+                this.visitedNodes,
+                this.reverseVisitedNodes);
     }
 
 }

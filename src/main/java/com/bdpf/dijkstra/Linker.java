@@ -4,7 +4,7 @@ import java.util.*;
  
 
 public class Linker<E> implements Iterable<E> {
-    private Linker<E> before; // Points to the previous node
+    public Linker<E> before; // Points to the previous node
     public E element; // The value of the current node
 
     private int size = 0;

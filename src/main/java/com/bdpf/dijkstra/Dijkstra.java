@@ -44,16 +44,20 @@ public class Dijkstra {
             // long endId = Dijkstra.getRelationshipId(this.endNode.getId(),
             // this.startNode.getId());
 
+            Set<Long> forwardVisitedNodes = new HashSet<>();
+            Set<Long> backForwardVisitedNodes = new HashSet<>();
+
             PathFinder startEntry = new PathFinder(this.forwardMap, this.backForwardMap, this.startNode, costEvaluator,
-                    getRelationships);
+                    getRelationships, forwardVisitedNodes, backForwardVisitedNodes);
             PathFinder endEntry = new PathFinder(this.backForwardMap, this.forwardMap, this.endNode, costEvaluator,
-                    getReverseRelationships);
+                    getReverseRelationships, backForwardVisitedNodes, forwardVisitedNodes);
             this.pq.add(startEntry);
             this.pq.add(endEntry);
 
             this.forwardMap.put(startEntry.getRelationshipId(this.startNode.getId(), this.endNode.getId()), startEntry);
-            // this.backForwardMap.put(startEntry.getRelationshipId(this.endNode.getId(), this.startNode.getId()),
-            //         endEntry);
+            // this.backForwardMap.put(startEntry.getRelationshipId(this.endNode.getId(),
+            // this.startNode.getId()),
+            // endEntry);
 
             // ;
             // Map<Node, PathFinder> map,
@@ -160,9 +164,15 @@ public class Dijkstra {
             // int iss = 0;
             // PathFinder backForwardEntry = backForwardPq.poll();
             // double minWeight = Double.NEGATIVE_INFINITY;
+
+            Set<Long> visitedNodes = new HashSet<>();
             while ((currentKPaths.size() < k && System.currentTimeMillis() < timeoutAt) &&
                     !Dijkstra.storage.isHeapAboveLimit(0.95) && currentEntry != null) {
+
                 // iss++;
+                // if (!visitedNodes.add(currentEntry.getId())) {
+                // continue;
+                // }
 
                 // if (iss > 15) {
                 // return currentKPaths.stream().map(path -> new ResponsePath(path));
@@ -203,16 +213,24 @@ public class Dijkstra {
                 // currentEntry.reverseMap.remove(currentEntry.getId());
 
                 // currentEntry.reverseMap.remove(currentEntry.getId());v
-
+                // if
+                // (currentEntry.reverseVisitedNodes.contains(currentEntry.getEndNode().getId()))
+                // {
+                // continue;
+                // }
+                currentEntry.visitedNodes.add(currentEntry.getEndNode().getId());
                 currentEntry.map.put(currentEntry.getId(), currentEntry);
+                // if (!visitedNodes.add(currentEntry.getEndNode().getId())) {
+                // continue;
+                // }
                 Iterable<Relationship> filteredRelationships = currentEntry.relationshipFilter
                         .getRelationships(currentEntry);
-
                 for (Relationship rel : filteredRelationships) {
                     Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
+                    // currentEntry.visitedNodes.add(neighbor.getId());
 
                     // if (currentEntry.isBlockNode2(neighbor)) {
-                    //     continue;
+                    // continue;
                     // }
 
                     // long relId = this.getRelationshipId(currentEntry.getEndNode().getId(),
@@ -227,14 +245,15 @@ public class Dijkstra {
                     // }
                     // if (neighbor.equals(endNode)) {
 
-                    //     log.info("111: " + (reverseMap != null));
-                    //     log.info("222: " + (currentEntry.map.containsKey(newEntry.getReverseId())));
+                    // log.info("111: " + (reverseMap != null));
+                    // log.info("222: " + (currentEntry.map.containsKey(newEntry.getReverseId())));
 
-                    //     return currentKPaths.stream().map(path -> new ResponsePath(path));
+                    // return currentKPaths.stream().map(path -> new ResponsePath(path));
                     // }
                     if (reverseMap != null) {
-                        if (isLessThanOrEqual(minWeight, reverseMap.getWeight())) {
-                            currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry, reverseMap));
+                        if (isLessThanOrEqual(minWeight, reverseMap.getWeight())
+                                && !currentEntry.isBlockNode2(reverseMap)) {
+                            currentKPaths.add(newEntry.relationshipFilter.toValue(newEntry, reverseMap));
                             minWeight = reverseMap.getWeight();
                         }
                         continue;
@@ -242,6 +261,7 @@ public class Dijkstra {
                     if (currentEntry.map.containsKey(newEntry.getReverseId())) {
                         continue;
                     }
+
                     // if (!currentEntry.isBlockNode2(reverseMapPath)) {}
                     // if (isLessThanOrEqual(minWeight, reverseMap.getWeight())) {
                     // currentKPaths.add(currentEntry.relationshipFilter.toValue(newEntry,
