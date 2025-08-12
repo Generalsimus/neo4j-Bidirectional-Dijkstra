@@ -12,8 +12,7 @@ import java.util.*;
 public class PathFinder {
     Map<Long, PathFinder> map;
     Map<Long, PathFinder> reverseMap;
-    Set<Long> visitedNodes;
-    Set<Long> reverseVisitedNodes;
+
     PathFinder endPath;
 
     //
@@ -30,40 +29,30 @@ public class PathFinder {
             Map<Long, PathFinder> reverseMap,
             Node endNode,
             CostEvaluator<Double> costEvaluator,
-            RelationshipFilter relationshipFilter,
-            Set<Long> visitedNodes,
-            Set<Long> reverseVisitedNodes) {
+            RelationshipFilter relationshipFilter) {
         this.map = map;
         this.reverseMap = reverseMap;
-        // this.id = id;
-        // this.reverseMap = reverseMap;
+
         this.endNode = endNode;
         this.costEvaluator = costEvaluator;
         this.relationshipFilter = relationshipFilter;
-        this.visitedNodes = visitedNodes;
-        this.reverseVisitedNodes = reverseVisitedNodes;
+
         this.chain = new Linker<Connection>();
 
-        // this.visitedNodes.add(endNode.getId());
     }
 
     PathFinder(Map<Long, PathFinder> map,
             Map<Long, PathFinder> reverseMap, Node endNode, Double weight, Linker<Connection> chain,
             CostEvaluator<Double> costEvaluator,
-            RelationshipFilter relationshipFilter,
-            Set<Long> visitedNodes,
-            Set<Long> reverseVisitedNodes) {
+            RelationshipFilter relationshipFilter) {
         this.map = map;
         this.reverseMap = reverseMap;
         this.endNode = endNode;
         this.weight = weight;
         this.costEvaluator = costEvaluator;
         this.relationshipFilter = relationshipFilter;
-        this.visitedNodes = visitedNodes;
-        this.reverseVisitedNodes = reverseVisitedNodes;
+
         this.chain = chain;
-        // this.visitedNodes.add(endNode.getId());
-        // this.id = id;
     }
 
     public Double getWeight() {
@@ -195,9 +184,7 @@ public class PathFinder {
                 this.weight + relCost,
                 this.chain.push(new Connection(this.getEndNode(), rel, newEndNode, relCost)),
                 this.costEvaluator,
-                this.relationshipFilter,
-                this.visitedNodes,
-                this.reverseVisitedNodes);
+                this.relationshipFilter);
     }
 
 }

@@ -20,7 +20,7 @@ public class ExpiringMapStorage<K, V extends Closeable> {
             this.runCleaner();
         };
 
-        // scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
     }
 
     public void runCleaner() {

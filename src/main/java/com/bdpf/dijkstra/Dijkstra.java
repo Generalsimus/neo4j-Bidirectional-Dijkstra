@@ -44,13 +44,13 @@ public class Dijkstra {
             // long endId = Dijkstra.getRelationshipId(this.endNode.getId(),
             // this.startNode.getId());
 
-            Set<Long> forwardVisitedNodes = new HashSet<>();
-            Set<Long> backForwardVisitedNodes = new HashSet<>();
+            // Set<Long> forwardVisitedNodes = new HashSet<>();
+            // Set<Long> backForwardVisitedNodes = new HashSet<>();
 
             PathFinder startEntry = new PathFinder(this.forwardMap, this.backForwardMap, this.startNode, costEvaluator,
-                    getRelationships, forwardVisitedNodes, backForwardVisitedNodes);
+                    getRelationships);
             PathFinder endEntry = new PathFinder(this.backForwardMap, this.forwardMap, this.endNode, costEvaluator,
-                    getReverseRelationships, backForwardVisitedNodes, forwardVisitedNodes);
+                    getReverseRelationships);
             this.pq.add(startEntry);
             this.pq.add(endEntry);
 
@@ -149,9 +149,6 @@ public class Dijkstra {
 
             LinkedList<AnyValue> currentKPaths = storage.currentKPaths;
 
-            // Map<Long, PathFinder> forwardMap = storage.forwardMap;
-            // Map<Long, PathFinder> backForwardMap = storage.backForwardMap;
-
             long timeoutAt = System.currentTimeMillis() + 1000 * timeoutSeconds;
 
             if (currentKPaths.size() >= k) {
@@ -161,94 +158,21 @@ public class Dijkstra {
             }
             double minWeight = Double.NEGATIVE_INFINITY;
             PathFinder currentEntry = pq.poll();
-            // int iss = 0;
-            // PathFinder backForwardEntry = backForwardPq.poll();
-            // double minWeight = Double.NEGATIVE_INFINITY;
 
-            Set<Long> visitedNodes = new HashSet<>();
             while ((currentKPaths.size() < k && System.currentTimeMillis() < timeoutAt) &&
                     !Dijkstra.storage.isHeapAboveLimit(0.95) && currentEntry != null) {
 
-                // iss++;
-                // if (!visitedNodes.add(currentEntry.getId())) {
-                // continue;
-                // }
-
-                // if (iss > 15) {
-                // return currentKPaths.stream().map(path -> new ResponsePath(path));
-                // }
-
-                // log.info("111: " + (reverseMapPath != null));
-                // log.info("id: " + currentEntry.getId());
-                // log.info("222: " +
-                // currentEntry.reverseMap.containsKey(currentEntry.getId()));
-                // log.info("to1: " + currentEntry.reverseMap.keySet());
-                // log.info("to2: " + currentEntry.map.keySet());
-
-                // log.info("to3: " + currentEntry.getEndNode().getProperty("phoneKey"));
-                // log.info("mpp4: " + currentEntry.map.containsKey(currentEntry.getId()));
-
-                // if (!currentEntry.map.containsKey(currentEntry.getId())) {
-
-                // // currentEntry.reverseMap.remove(currentEntry.getId());s
-                // continue;
-                // }
-                // if (!currentEntry.map.containsKey(currentEntry.getId())) {
-                // continue;
-                // }
-                // if (!currentEntry.map.containsKey(currentEntry.getId())) {
-                // log.info("ID: " + currentEntry.getId());
-                // PathFinder reverseMapPath =
-                // currentEntry.reverseMap.get(currentEntry.reverseId());
-                // if (reverseMapPath != null) {
-                // if (isLessThanOrEqual(minWeight, reverseMapPath.getWeight())) {
-                // currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry,
-                // reverseMapPath));
-                // }
-                // // continue;
-                // }
-                // continue;
-                // }
-                // currentEntry.map.remove(currentEntry.getId());
-                // currentEntry.reverseMap.remove(currentEntry.getId());
-
-                // currentEntry.reverseMap.remove(currentEntry.getId());v
-                // if
-                // (currentEntry.reverseVisitedNodes.contains(currentEntry.getEndNode().getId()))
-                // {
-                // continue;
-                // }
-                currentEntry.visitedNodes.add(currentEntry.getEndNode().getId());
                 currentEntry.map.put(currentEntry.getId(), currentEntry);
-                // if (!visitedNodes.add(currentEntry.getEndNode().getId())) {
-                // continue;
-                // }
+
                 Iterable<Relationship> filteredRelationships = currentEntry.relationshipFilter
                         .getRelationships(currentEntry);
                 for (Relationship rel : filteredRelationships) {
                     Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
-                    // currentEntry.visitedNodes.add(neighbor.getId());
 
-                    // if (currentEntry.isBlockNode2(neighbor)) {
-                    // continue;
-                    // }
-
-                    // long relId = this.getRelationshipId(currentEntry.getEndNode().getId(),
-                    // neighbor.getId());
                     Double weight = costEvaluator.getCost(rel, currentEntry);
                     PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
-                    // if()
                     PathFinder reverseMap = currentEntry.reverseMap.get(newEntry.getReverseId());
-                    // currentEntry.map.remove(newEntry.getId());s
-                    // if (currentEntry.isBlockNode(neighbor)) {
-                    // continue;
-                    // }
-                    // if (neighbor.equals(endNode)) {
 
-                    // log.info("111: " + (reverseMap != null));
-                    // log.info("222: " + (currentEntry.map.containsKey(newEntry.getReverseId())));
-
-                    // return currentKPaths.stream().map(path -> new ResponsePath(path));
                     // }
                     if (reverseMap != null) {
                         if (isLessThanOrEqual(minWeight, reverseMap.getWeight())
@@ -262,22 +186,7 @@ public class Dijkstra {
                         continue;
                     }
 
-                    // if (!currentEntry.isBlockNode2(reverseMapPath)) {}
-                    // if (isLessThanOrEqual(minWeight, reverseMap.getWeight())) {
-                    // currentKPaths.add(currentEntry.relationshipFilter.toValue(newEntry,
-                    // reverseMap));
-                    // minWeight = reverseMap.getWeight();
-                    // }
-
-                    // }
-                    // if (reverseMap == null) {x
-                    // } else {
-
                     pq.add(newEntry);
-                    // }
-                    // if (!currentEntry.reverseMap.containsKey(relId)) {
-                    // }
-                    // }
                 }
 
                 currentEntry = pq.poll();
