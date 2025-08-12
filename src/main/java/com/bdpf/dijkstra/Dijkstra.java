@@ -39,18 +39,23 @@ public class Dijkstra {
             this.startNode = this.tx.getNodeByElementId(startNode.getElementId());
             this.endNode = this.tx.getNodeByElementId(endNode.getElementId());
 
-            long startId = Dijkstra.getRelationshipId(this.startNode.getId(), this.endNode.getId());
+            // long startId = Dijkstra.getRelationshipId(this.startNode.getId(),
+            // this.endNode.getId());
+            // long endId = Dijkstra.getRelationshipId(this.endNode.getId(),
+            // this.startNode.getId());
 
             PathFinder startEntry = new PathFinder(this.forwardMap, this.backForwardMap, this.startNode, costEvaluator,
-                    getRelationships, startId);
+                    getRelationships);
             PathFinder endEntry = new PathFinder(this.backForwardMap, this.forwardMap, this.endNode, costEvaluator,
-                    getReverseRelationships, startId);
+                    getReverseRelationships);
             this.pq.add(startEntry);
             this.pq.add(endEntry);
 
-            // this.forwardMap.put(startId, startEntry);
-            // this.backForwardMap.put(startId, endEntry);
+            this.forwardMap.put(startEntry.getRelationshipId(this.startNode.getId(), this.endNode.getId()), startEntry);
+            // this.backForwardMap.put(startEntry.getRelationshipId(this.endNode.getId(), this.startNode.getId()),
+            //         endEntry);
 
+            // ;
             // Map<Node, PathFinder> map,
             // Map<Node, PathFinder> reverseMap,
             // Node endNode,
@@ -99,12 +104,14 @@ public class Dijkstra {
         return String.format("%.2f MB", bytes / (double) MB);
     }
 
-    public static long getRelationshipId(long id1, long id2) {
-        long sum = id1 + id2;
-        long min = id1 < id2 ? id1 : id2;
-        long max = sum - min;
-        return (sum * (sum + 1) / 2) + max;
-    }
+    // public static long getRelationshipId(long id1, long id2) {
+    // // return (((id1 + id2) * (id1 + id2 + 1)) / 2) + id2;
+
+    // long sum = id1 + id2;
+    // long min = id1 < id2 ? id1 : id2;
+    // long max = sum - min;
+    // return (sum * (sum + 1) / 2) + max;
+    // }
 
     public Stream<ResponsePath> find(
             GraphDatabaseService db,
@@ -160,14 +167,11 @@ public class Dijkstra {
                 // if (iss > 15) {
                 // return currentKPaths.stream().map(path -> new ResponsePath(path));
                 // }
-                PathFinder reverseMapPath = currentEntry.reverseMap.get(currentEntry.getId());
-                // if (reverseMapPath != null && currentEntry.chain.getSize() != 0) {
-                // continue;
-                // }
 
                 // log.info("111: " + (reverseMapPath != null));
                 // log.info("id: " + currentEntry.getId());
-                // log.info("222: " + currentEntry.reverseMap.containsKey(currentEntry.getId()));
+                // log.info("222: " +
+                // currentEntry.reverseMap.containsKey(currentEntry.getId()));
                 // log.info("to1: " + currentEntry.reverseMap.keySet());
                 // log.info("to2: " + currentEntry.map.keySet());
 
@@ -182,43 +186,77 @@ public class Dijkstra {
                 // if (!currentEntry.map.containsKey(currentEntry.getId())) {
                 // continue;
                 // }
-
+                // if (!currentEntry.map.containsKey(currentEntry.getId())) {
+                // log.info("ID: " + currentEntry.getId());
+                // PathFinder reverseMapPath =
+                // currentEntry.reverseMap.get(currentEntry.reverseId());
+                // if (reverseMapPath != null) {
+                // if (isLessThanOrEqual(minWeight, reverseMapPath.getWeight())) {
+                // currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry,
+                // reverseMapPath));
+                // }
+                // // continue;
+                // }
+                // continue;
+                // }
                 // currentEntry.map.remove(currentEntry.getId());
                 // currentEntry.reverseMap.remove(currentEntry.getId());
 
                 // currentEntry.reverseMap.remove(currentEntry.getId());v
-                currentEntry.map.put(currentEntry.getId(), currentEntry);
 
+                currentEntry.map.put(currentEntry.getId(), currentEntry);
                 Iterable<Relationship> filteredRelationships = currentEntry.relationshipFilter
                         .getRelationships(currentEntry);
 
                 for (Relationship rel : filteredRelationships) {
                     Node neighbor = rel.getOtherNode(currentEntry.getEndNode());
 
-                    long relId = this.getRelationshipId(currentEntry.getEndNode().getId(), neighbor.getId());
+                    // if (currentEntry.isBlockNode2(neighbor)) {
+                    //     continue;
+                    // }
+
+                    // long relId = this.getRelationshipId(currentEntry.getEndNode().getId(),
+                    // neighbor.getId());
                     Double weight = costEvaluator.getCost(rel, currentEntry);
-                    PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor, relId);
+                    PathFinder newEntry = currentEntry.addRelationship(rel, weight, neighbor);
                     // if()
-                    PathFinder reverseMap = currentEntry.reverseMap.get(relId);
+                    PathFinder reverseMap = currentEntry.reverseMap.get(newEntry.getReverseId());
                     // currentEntry.map.remove(newEntry.getId());s
-                    if (currentEntry.isBlockNode(neighbor)) {
-                        continue;
-                    }
+                    // if (currentEntry.isBlockNode(neighbor)) {
+                    // continue;
+                    // }
+                    // if (neighbor.equals(endNode)) {
+
+                    //     log.info("111: " + (reverseMap != null));
+                    //     log.info("222: " + (currentEntry.map.containsKey(newEntry.getReverseId())));
+
+                    //     return currentKPaths.stream().map(path -> new ResponsePath(path));
+                    // }
                     if (reverseMap != null) {
-                        if (reverseMap.isBlockNode2(neighbor)) {
-                            continue;
-                        }
-                        // if (!currentEntry.isBlockNode2(reverseMapPath)) {
                         if (isLessThanOrEqual(minWeight, reverseMap.getWeight())) {
-                            currentKPaths.add(currentEntry.relationshipFilter.toValue(newEntry, reverseMap));
+                            currentKPaths.add(currentEntry.relationshipFilter.toValue(currentEntry, reverseMap));
                             minWeight = reverseMap.getWeight();
                         }
-                        // continue;
-
+                        continue;
                     }
+                    if (currentEntry.map.containsKey(newEntry.getReverseId())) {
+                        continue;
+                    }
+                    // if (!currentEntry.isBlockNode2(reverseMapPath)) {}
+                    // if (isLessThanOrEqual(minWeight, reverseMap.getWeight())) {
+                    // currentKPaths.add(currentEntry.relationshipFilter.toValue(newEntry,
+                    // reverseMap));
+                    // minWeight = reverseMap.getWeight();
+                    // }
+
+                    // }
+                    // if (reverseMap == null) {x
+                    // } else {
+
+                    pq.add(newEntry);
+                    // }
                     // if (!currentEntry.reverseMap.containsKey(relId)) {
                     // }
-                    pq.add(newEntry);
                     // }
                 }
 

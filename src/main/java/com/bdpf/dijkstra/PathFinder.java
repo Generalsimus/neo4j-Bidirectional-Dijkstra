@@ -14,7 +14,8 @@ public class PathFinder {
     Map<Long, PathFinder> reverseMap;
     PathFinder endPath;
 
-    long id = 0;
+    // long id = 0;
+    // long reverseId = 0;
     //
     Node endNode;
 
@@ -29,11 +30,10 @@ public class PathFinder {
             Map<Long, PathFinder> reverseMap,
             Node endNode,
             CostEvaluator<Double> costEvaluator,
-            RelationshipFilter relationshipFilter,
-            long id) {
+            RelationshipFilter relationshipFilter) {
         this.map = map;
         this.reverseMap = reverseMap;
-        this.id = id;
+        // this.id = id;
         // this.reverseMap = reverseMap;
         this.endNode = endNode;
         this.costEvaluator = costEvaluator;
@@ -44,7 +44,7 @@ public class PathFinder {
     PathFinder(Map<Long, PathFinder> map,
             Map<Long, PathFinder> reverseMap, Node endNode, Double weight, Linker<Connection> chain,
             CostEvaluator<Double> costEvaluator,
-            RelationshipFilter relationshipFilter, long id) {
+            RelationshipFilter relationshipFilter) {
         this.map = map;
         this.reverseMap = reverseMap;
         this.endNode = endNode;
@@ -52,7 +52,7 @@ public class PathFinder {
         this.costEvaluator = costEvaluator;
         this.relationshipFilter = relationshipFilter;
         this.chain = chain;
-        this.id = id;
+        // this.id = id;
     }
 
     public Double getWeight() {
@@ -101,7 +101,7 @@ public class PathFinder {
         // return this.endNode.equals(node);
         // }
         // if (this.chain.getSize() == 0) {
-            // return this.endNode.equals(node);
+        // return this.endNode.equals(node);
         // }
         return false;
         // return this.isBlockNode(point.getEndNode());
@@ -131,8 +131,28 @@ public class PathFinder {
         return this.endNode;
     }
 
-    public Long getId() {
-        return this.id;
+    public static long getRelationshipId(long id1, long id2) {
+        return (((id1 + id2) * (id1 + id2 + 1)) / 2) + id2;
+
+        // long sum = id1 + id2;
+        // long min = id1 < id2 ? id1 : id2;
+        // long max = sum - min;
+        // return (sum * (sum + 1) / 2) + max;
+    }
+
+    public long getId() {
+        if (this.chain.getSize() == 0) {
+            return -1;
+        }
+        return this.getRelationshipId(this.chain.element.start.getId(), this.chain.element.end.getId());
+    }
+
+    public long getReverseId() {
+        if (this.chain.getSize() == 0) {
+            return -2;
+        }
+        return this.getRelationshipId(this.chain.element.end.getId(), this.chain.element.start.getId());
+        // return this.id;
     }
 
     public Node getPreviousNode() {
@@ -142,7 +162,7 @@ public class PathFinder {
         return null;
     }
 
-    public PathFinder addRelationship(Relationship rel, Double relCost, Node newEndNode, long newId) {
+    public PathFinder addRelationship(Relationship rel, Double relCost, Node newEndNode) {
         return new PathFinder(
                 this.map,
                 this.reverseMap,
@@ -150,8 +170,7 @@ public class PathFinder {
                 this.weight + relCost,
                 this.chain.push(new Connection(this.getEndNode(), rel, newEndNode, relCost)),
                 this.costEvaluator,
-                this.relationshipFilter,
-                newId);
+                this.relationshipFilter);
     }
 
 }
