@@ -32,7 +32,7 @@ public class ExpiringMapStorage<K, V extends Closeable> {
                 }
 
                 if (entry.isLocked()) {
-                    this.updateExpirationTimeSeconds(entry.key, 2);
+                    entry.updateExpirationTimeSeconds(2);
                     continue;
                 }
                 if (System.currentTimeMillis() < entry.getExpiredAt() && !this.isHeapAboveLimit(0.80)) {
@@ -82,7 +82,9 @@ public class ExpiringMapStorage<K, V extends Closeable> {
             ExpiringEntry<V, K> entry = this.map.get(key);
             this.remove(key);
             if (entry != null) {
-                this.put(key, entry.value, expirationTimeSeconds);
+                entry.updateExpirationTimeSeconds(expirationTimeSeconds);
+                pq.add(entry);
+                map.put(key, entry);
             }
         }
     }

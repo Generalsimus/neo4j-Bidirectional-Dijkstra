@@ -110,7 +110,6 @@ public class Dijkstra {
 
     // public static long getRelationshipId(long id1, long id2) {
     // // return (((id1 + id2) * (id1 + id2 + 1)) / 2) + id2;
-
     // long sum = id1 + id2;
     // long min = id1 < id2 ? id1 : id2;
     // long max = sum - min;
@@ -193,12 +192,13 @@ public class Dijkstra {
             }
 
             if (currentKPaths.isEmpty()) {
-                Dijkstra.storage.remove(storageKey);
-                storage.close();
+                // Dijkstra.storage.remove(storageKey);
+                // storage.close();
                 return Stream.empty();
             }
-
-            return currentKPaths.stream().map(path -> new ResponsePath(path));
+            return currentKPaths.stream()
+                    .limit(k)
+                    .map(path -> new ResponsePath(path));
         } catch (Exception e) {
             log.error("Error in shortestPath for storageKey: %s", storageKey, e);
             throw new RuntimeException("Failed to compute path", e);
